@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Tabs to PWA - 1-Click App Windows",
+  "version": "1.0.0",
+  "description": "Batch move open Google and web tabs into standalone, frameless PWA app windows with a single click or keyboard shortcut.",
+  "permissions": [
+    "tabs",
+    "storage"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Tabs to PWA",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "move_all_pwas": {
+      "suggested_key": {
+        "default": "Alt+Shift+P"
+      },
+      "description": "Move all open PWA tabs to standalone windows"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}
