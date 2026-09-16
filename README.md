@@ -1,31 +1,33 @@
 # Open in App (Chrome Extension)
 
-A high-performance, production-ready Manifest V3 Google Chrome extension that batch-moves open tabs into standalone app windows or dedicated windows with full toolbar support — with **1 click** or a single keyboard shortcut (<kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd>).
+A high-performance, production-ready Manifest V3 Google Chrome extension that batch-moves open tabs into standalone app windows or dedicated windows with full toolbar support — with **1 click**, a right-click context menu, or a global keyboard shortcut (<kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd>).
 
 ---
 
-## Why "Open in App"?
+## What's New in v1.2.0
 
-Google Chrome natively uses the term **"Open in app"** (seen in the Omnibox icon and the tab right-click menu) rather than technical jargon like "PWA". 
-
-While Chrome only allows opening tabs into apps **one by one**, this extension gives you the missing feature: **a 1-click batch action to open all eligible tabs across your browser into their dedicated app windows at once.**
+* 🖱️ **Context Menu Integration**: Right-click on any page background → **"Open this Tab in App Window"**; or right-click the extension icon → **"Open All Matching Tabs in App Windows"**.
+* 📌 **Pinned Tab Protection**: New setting (enabled by default) that prevents your permanently docked/pinned tabs from being detached during batch moves.
+* 🔢 **Dynamic Toolbar Badge**: Extension icon displays a real-time badge count of open app tabs detected in your browser.
+* 🧪 **Automated Test Suite**: Full unit test coverage (`npm test`) using Node's native test runner for domain normalization, tab filtering, and URL matching.
+* 📦 **Modular ES Module Architecture**: Clean separation of core matching logic in `utils/matcher.js`.
 
 ---
 
-## Features
+## Key Features
 
-* ⚡ **1-Click Batch Open**: Instantly scans open tabs and opens all matching web apps (Gmail, YouTube, Calendar, Chat, etc.) into their own dedicated windows.
-* 🛡️ **Smooth Multi-Tab Throttling**: Batch-moves 20, 50, or 100+ tabs without stuttering or freezing Chrome using an asynchronous spaced queue.
-* 🎛️ **Dual Window Modes**:
+* **1-Click Batch Open**: Instantly scans open tabs and opens all matching web apps (Gmail, YouTube, Calendar, Chat, etc.) into their own dedicated windows.
+* **Smooth Multi-Tab Throttling**: Batch-moves 20, 50, or 100+ tabs without stuttering or freezing Chrome using an asynchronous spaced queue.
+* **Dual Window Modes**:
   * **Frameless App Mode (Default):** Clean, distraction-free app-like windows without URL bars or tabs.
-  * **Dedicated Window Mode:** Preserves the browser toolbar, bookmarks bar, extensions puzzle piece menu, and extension buttons for users who rely on extensions.
-* 🎯 **Window Scope Selector**: Toggle between **Current Window** and **All Windows** with a single click.
-* ☑️ **Selective Tab Checklist**: Select or uncheck specific tabs before moving, plus a master "Select All" toggle.
-* 📊 **Real-time Progress Bar**: Visual feedback displaying move progress in real time.
-* 🔄 **Preserves Live State**: Uses native tab reparenting — your media playback (audio/video), unsaved form text, and active sessions are **never interrupted or reloaded**.
-* ⌨️ **Global Shortcut**: Press <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> anytime to convert all eligible tabs according to your saved preferences.
-* 🌐 **Preloaded Presets**: Out-of-the-box support for Google Apps (YouTube, YouTube Music, Gmail, Calendar, Chat, Meet, Keep, Drive, Maps, Gemini, AI Studio, Messages) and popular web apps (ChatGPT, Claude, WhatsApp Web, Instagram).
-* 🛠️ **Custom Domain Manager**: Add any custom domain or self-hosted service (e.g. Home Assistant, internal dashboards, GitHub).
+  * **Dedicated Window Mode:** Preserves the browser toolbar, bookmarks bar, extensions puzzle piece menu, and extension buttons for users who rely on password managers or ad blockers.
+* **Window Scope Selector**: Toggle between **Current Window** and **All Windows** with a single click.
+* **Selective Tab Checklist**: Select or uncheck specific tabs before moving, plus a master "Select All" toggle.
+* **Real-time Progress Bar**: Visual feedback displaying move progress in real time.
+* **Preserves Live State**: Uses native tab reparenting — your media playback (audio/video), unsaved form text, and active sessions are **never interrupted or reloaded**.
+* **Global Shortcut**: Press <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> anytime to convert all eligible tabs according to your saved preferences.
+* **Preloaded Presets**: Out-of-the-box support for Google Apps (YouTube, YouTube Music, Gmail, Calendar, Chat, Meet, Keep, Drive, Maps, Gemini, AI Studio, Messages) and popular web apps (ChatGPT, Claude, WhatsApp Web, Instagram).
+* **Custom Domain Manager**: Add any custom domain or self-hosted service (e.g. Home Assistant, internal dashboards, GitHub).
 
 ---
 
@@ -51,23 +53,39 @@ While Chrome only allows opening tabs into apps **one by one**, this extension g
 3. Review the detected tabs. Check or uncheck any tabs you want to open.
 4. Click **"Open Selected in App (N)"** to detach them all, or click the individual popout icon next to any single tab.
 
-### 2. Global Keyboard Shortcut
+### 2. Context Menus
+* **On any page:** Right-click anywhere on the page and select **"Open this Tab in App Window"**.
+* **On the extension icon:** Right-click the **Open in App** icon in your toolbar and select **"Open All Matching Tabs in App Windows"**.
+
+### 3. Global Keyboard Shortcut
 * Press <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> at any time.
-* All matching tabs will be opened in app windows according to your saved Scope and Window Mode preferences.
+* All matching tabs will be opened in app windows according to your saved Scope, Window Mode, and Pinned Tab preferences.
 * You can customize this shortcut anytime at `chrome://extensions/shortcuts`.
 
-### 3. Choosing Window Style
-* Open the popup and click the **Settings (gear)** icon.
-* Under **Window Style**, select:
-  * **Frameless App Mode**: For clean, distraction-free player/app windows.
-  * **Dedicated Window**: If you need access to your extensions (ad blockers, password managers) and navigation controls.
+---
+
+## Automated Tests
+
+Run the unit test suite at any time:
+
+```bash
+npm test
+```
+
+The test suite runs via Node.js native test runner (`node --test`) in ~150ms with zero external dependencies. It verifies:
+* Domain normalization and protocol stripping
+* Subdomain and root domain URL matching
+* Pinned tab protection logic
+* Popup window exclusion logic
+* Preset schema and configuration integrity
 
 ---
 
 ## Technical Architecture
 
-* **Manifest Version:** 3 (`service_worker` background script).
+* **Manifest Version:** 3 (`service_worker` background script with `type: "module"`).
 * **Permissions:**
   * `tabs`: Required to detect open tab URLs and titles, and reparent `tab.id`.
   * `storage`: Used to persist user settings, mode, scope, and custom domain configurations across sessions.
-* **Window Mechanism:** Uses `chrome.windows.create({ tabId, type: windowMode })` with pacing to safely detach live browser tabs into standalone windows without reloading.
+  * `contextMenus`: Used to provide right-click single-tab and batch-tab actions.
+* **Window Mechanism:** Uses `chrome.windows.create({ tabId, type: windowMode })` with adaptive pacing to safely detach live browser tabs into standalone windows without reloading.

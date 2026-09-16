@@ -122,6 +122,22 @@
         </div>
       </div>
 
+      <!-- Tab Protection Settings -->
+      <div class="settings-section">
+        <h2 class="settings-heading">Tab Protection</h2>
+        <p class="settings-desc">Prevent tabs you want to keep docked from being moved.</p>
+        <div class="preset-item">
+          <div class="preset-label">
+            <span class="preset-name">Protect Pinned Tabs</span>
+            <span class="preset-domain">Skip pinned tabs during batch operations</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="chk-ignore-pinned" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
       <!-- Enabled Apps Section -->
       <div class="settings-section">
         <h2 class="settings-heading">Supported Apps</h2>
@@ -144,10 +160,10 @@
     <!-- Footer Status -->
     <footer class="app-footer">
       <span id="status-message">Ready</span>
-      <span class="version-label">v1.1.0</span>
+      <span class="version-label">v1.2.0</span>
     </footer>
   </div>
 
-  <script src="popup.js"></script>
+  <script type="module" src="popup.js"></script>
 </body>
 </html>

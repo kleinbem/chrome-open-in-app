@@ -1,4 +1,6 @@
-// Open in App - Popup Logic v1.1.0
+// Open in App - Popup Logic v1.2.0 (ES Module)
+
+import { normalizeDomain } from '../utils/matcher.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Navigation elements
@@ -30,6 +32,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Settings view elements
   const modePopupRadio = document.getElementById('mode-popup');
   const modeNormalRadio = document.getElementById('mode-normal');
+  const chkIgnorePinned = document.getElementById('chk-ignore-pinned');
   const presetsList = document.getElementById('presets-list');
   const customDomainsList = document.getElementById('custom-domains-list');
   const formAddCustom = document.getElementById('form-add-custom');
@@ -41,7 +44,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     presets: [],
     customDomains: [],
     windowMode: 'popup',
-    windowScope: 'current'
+    windowScope: 'current',
+    ignorePinnedTabs: true
   };
   let currentTabs = [];
   const selectedTabIds = new Set();
@@ -342,7 +346,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           presets: response.presets || [],
           customDomains: response.customDomains || [],
           windowMode: response.windowMode || 'popup',
-          windowScope: response.windowScope || 'current'
+          windowScope: response.windowScope || 'current',
+          ignorePinnedTabs: response.ignorePinnedTabs !== false
         };
 
         if (currentConfig.windowMode === 'normal') {
@@ -352,6 +357,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           modePopupRadio.checked = true;
           windowModeBadge.textContent = 'App Mode';
         }
+
+        chkIgnorePinned.checked = currentConfig.ignorePinnedTabs;
 
         renderPresets();
         renderCustomDomains();
@@ -377,6 +384,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       windowModeBadge.textContent = 'Normal Window';
       await saveConfig({ windowMode: 'normal' });
     }
+  });
+
+  // Pinned tabs protection listener
+  chkIgnorePinned.addEventListener('change', async () => {
+    currentConfig.ignorePinnedTabs = chkIgnorePinned.checked;
+    await saveConfig({ ignorePinnedTabs: chkIgnorePinned.checked });
   });
 
   function renderPresets() {
@@ -462,30 +475,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   formAddCustom.addEventListener('submit', async (e) => {
     e.preventDefault();
-    let val = inputCustomDomain.value.trim().toLowerCase();
-    if (!val) return;
-
-    try {
-      if (val.startsWith('http://') || val.startsWith('https://')) {
-        val = new URL(val).hostname;
-      } else if (val.includes('/')) {
-        val = val.split('/')[0];
-      }
-    } catch {
-      // Keep as is
-    }
+    const clean = normalizeDomain(inputCustomDomain.value);
+    if (!clean) return;
 
     const exists = currentConfig.customDomains.some((c) => {
       const d = typeof c === 'string' ? c : c.domain;
-      return d.toLowerCase() === val;
+      return normalizeDomain(d) === clean;
     });
 
     if (!exists) {
-      currentConfig.customDomains.push({ domain: val, enabled: true });
+      currentConfig.customDomains.push({ domain: clean, enabled: true });
       await saveConfig({ customDomains: currentConfig.customDomains });
       renderCustomDomains();
       inputCustomDomain.value = '';
-      setStatus(`Added: ${val}`);
+      setStatus(`Added: ${clean}`);
     } else {
       setStatus('Domain already exists');
     }
@@ -511,8 +514,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       presets: initialConfig.presets || [],
       customDomains: initialConfig.customDomains || [],
       windowMode: initialConfig.windowMode || 'popup',
-      windowScope: initialConfig.windowScope || 'current'
+      windowScope: initialConfig.windowScope || 'current',
+      ignorePinnedTabs: initialConfig.ignorePinnedTabs !== false
     };
+
     if (currentConfig.windowScope === 'all') {
       scopeAllBtn.classList.add('active');
       scopeCurrentBtn.classList.remove('active');
@@ -526,6 +531,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       windowModeBadge.textContent = 'App Mode';
     }
+
+    chkIgnorePinned.checked = currentConfig.ignorePinnedTabs;
   }
 
   await refreshTabs();
