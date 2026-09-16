@@ -49,7 +49,6 @@ jobs:
             popup \
             icons \
             utils \
-            README.md \
             -x "*.DS_Store" "*__tests__*"
 
           echo "Package created successfully: $ZIP_NAME"

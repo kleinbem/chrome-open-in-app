@@ -9,7 +9,7 @@ def package_extension():
     version = manifest.get('version', '1.0.0')
     output_zip = f'open-in-app-v{version}.zip'
 
-    files_to_pack = ['manifest.json', 'background.js', 'README.md']
+    files_to_pack = ['manifest.json', 'background.js']
     dirs_to_pack = ['popup', 'icons', 'utils']
 
     if os.path.exists(output_zip):
