@@ -6,6 +6,7 @@ import {
   urlMatchesApp,
   filterEligibleTabs,
   findExistingAppWindow,
+  findMatchingInstalledApp,
   DEFAULT_PRESETS,
   DEFAULT_CONFIG
 } from '../utils/matcher.js';
@@ -206,6 +207,25 @@ describe('Smart App Window Reuse', () => {
     assert.strictEqual(result, null);
   });
 
+  test('precisely selects matching tab in multi-tab app windows', () => {
+    const allWindows = [
+      {
+        id: 5,
+        type: 'app',
+        tabs: [
+          { id: 201, url: 'https://news.ycombinator.com' },
+          { id: 202, url: 'https://youtube.com/watch?v=1' },
+          { id: 203, url: 'https://reddit.com' }
+        ]
+      }
+    ];
+
+    const result = findExistingAppWindow('https://youtube.com/watch?v=2', allWindows, activeDomains);
+    assert.ok(result);
+    assert.strictEqual(result.window.id, 5);
+    assert.strictEqual(result.primaryTab.id, 202);
+  });
+
   test('returns null if no window matches the domain', () => {
     const allWindows = [
       { id: 2, type: 'app', tabs: [{ id: 102, url: 'https://youtube.com/' }] }
@@ -222,3 +242,86 @@ describe('Smart App Window Reuse', () => {
     assert.strictEqual(findExistingAppWindow('chrome://settings', [{ type: 'app', tabs: [] }], activeDomains), null);
   });
 });
+
+describe('Installed PWA Detection & Launch Matching', () => {
+  const mockInstalledApps = [
+    {
+      id: 'agimnkijcaahngcdmfeangaknmldooml',
+      name: 'YouTube',
+      type: 'hosted_app',
+      appLaunchUrl: 'https://www.youtube.com/',
+      enabled: true
+    },
+    {
+      id: 'fmgjjmmmlfnkbppncabfkddbjimcfncm',
+      name: 'Gmail',
+      type: 'hosted_app',
+      appLaunchUrl: 'https://mail.google.com/mail/installwebapp?usp=chrome_default',
+      enabled: true
+    },
+    {
+      id: 'disabled_app_id',
+      name: 'Disabled App',
+      type: 'hosted_app',
+      appLaunchUrl: 'https://disabled.com/',
+      enabled: false
+    },
+    {
+      id: 'extension_id',
+      name: 'AdBlocker',
+      type: 'extension',
+      enabled: true
+    },
+    {
+      id: 'custom_pwa_id',
+      name: 'Internal Dashboard',
+      type: 'packaged_app',
+      appLaunchUrl: 'https://dash.internal.corp/app',
+      enabled: true
+    }
+  ];
+
+  test('matches installed PWA by appLaunchUrl', () => {
+    const match = findMatchingInstalledApp('https://www.youtube.com/watch?v=dQw4w9WgXcQ', mockInstalledApps);
+    assert.ok(match);
+    assert.strictEqual(match.id, 'agimnkijcaahngcdmfeangaknmldooml');
+    assert.strictEqual(match.name, 'YouTube');
+  });
+
+  test('matches installed PWA with query params in launch URL', () => {
+    const match = findMatchingInstalledApp('https://mail.google.com/mail/u/0/#inbox', mockInstalledApps);
+    assert.ok(match);
+    assert.strictEqual(match.id, 'fmgjjmmmlfnkbppncabfkddbjimcfncm');
+  });
+
+  test('matches custom packaged/hosted app', () => {
+    const match = findMatchingInstalledApp('https://dash.internal.corp/reports', mockInstalledApps);
+    assert.ok(match);
+    assert.strictEqual(match.id, 'custom_pwa_id');
+  });
+
+  test('ignores disabled apps', () => {
+    const match = findMatchingInstalledApp('https://disabled.com/page', mockInstalledApps);
+    assert.strictEqual(match, null);
+  });
+
+  test('ignores standard browser extensions even if enabled', () => {
+    const match = findMatchingInstalledApp('chrome-extension://extension_id/options.html', mockInstalledApps);
+    assert.strictEqual(match, null);
+  });
+
+  test('returns null when no installed app matches URL', () => {
+    const match = findMatchingInstalledApp('https://news.ycombinator.com', mockInstalledApps);
+    assert.strictEqual(match, null);
+  });
+
+  test('handles malformed, non-HTTP, and prototype poison inputs safely', () => {
+    assert.strictEqual(findMatchingInstalledApp('', mockInstalledApps), null);
+    assert.strictEqual(findMatchingInstalledApp(null, mockInstalledApps), null);
+    assert.strictEqual(findMatchingInstalledApp('javascript:alert(1)', mockInstalledApps), null);
+    assert.strictEqual(findMatchingInstalledApp('https://__proto__', mockInstalledApps), null);
+    assert.strictEqual(findMatchingInstalledApp('https://youtube.com', null), null);
+    assert.strictEqual(findMatchingInstalledApp('https://youtube.com', []), null);
+  });
+});
+

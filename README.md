@@ -4,13 +4,12 @@ A high-performance, production-ready Manifest V3 Google Chrome extension that ba
 
 ---
 
-## What's New in v1.3.0
+## What's New in v1.4.0
 
-* 🔄 **Smart App Window Reuse**: Automatically detects if an installed PWA or app window for that domain is already open (`win.type === 'app'` or `'popup'`). It brings the existing window to the front, navigates it to the tab's URL, and closes the duplicate browser tab instead of spawning redundant windows.
-* ⚙️ **App Window Reuse Setting**: New toggle in Settings (**"Reuse Existing App Windows"**, enabled by default).
-* 🏷️ **Dynamic Versioning**: Popup footer dynamically displays the version from `manifest.json`.
-* 🩺 **Startup Diagnostics**: Added console diagnostic markers in the service worker and popup UI for instant DevTools verification.
-* 🧪 **Expanded Test Suite**: 30 automated tests passing across 10 test suites (`npm test`).
+* 🚀 **Native PWA Launching via `chrome.management`**: Automatically detects installed Progressive Web Apps (YouTube, Gmail, Calendar, etc.) and launches them through Chromium's native app manager (`chrome.management.launchApp`). This ensures the OS window manager assigns the native `StartupWMClass`, displaying the app with its real icon and name on the Linux/Windows taskbar or dock!
+* 🪟 **Window Type Filter Correction**: Fixed window queries to query `windowTypes: ['normal', 'popup', 'app']` across all service worker APIs. Running PWA windows (`type: 'app'`) are now fully visible, allowing instantaneous window reuse, tab updating, and focus switching.
+* 🎯 **Precise Multi-Tab Targeting**: When reusing a multi-tab PWA window, the extension targets the specific matching tab.
+* 🧪 **38 Automated Tests**: All unit tests and security audits passing (`npm test`, 100% test coverage for matchers and sinks).
 * 📜 **Changelog**: Comprehensive release notes maintained in [`CHANGELOG.md`](CHANGELOG.md).
 
 ---

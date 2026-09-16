@@ -4,6 +4,7 @@ import {
   getActiveDomains,
   filterEligibleTabs,
   findExistingAppWindow,
+  findMatchingInstalledApp,
   DEFAULT_CONFIG
 } from './utils/matcher.js';
 
@@ -69,7 +70,10 @@ async function getMatchingTabs(scope = 'current') {
   const config = await chrome.storage.sync.get(['ignorePinnedTabs']);
   const ignorePinned = config.ignorePinnedTabs !== false;
 
-  const allWindows = await chrome.windows.getAll({ populate: true });
+  const allWindows = await chrome.windows.getAll({
+    populate: true,
+    windowTypes: ['normal', 'popup', 'app']
+  });
   const popupWindowIds = new Set();
   for (const win of allWindows) {
     if (win.type === 'popup' || win.type === 'app' || (win.tabs && win.tabs.length === 1 && win.type === 'popup')) {
@@ -81,7 +85,9 @@ async function getMatchingTabs(scope = 'current') {
   if (scope === 'all') {
     rawTabs = await chrome.tabs.query({});
   } else {
-    const currentWin = await chrome.windows.getLastFocused();
+    const currentWin = await chrome.windows.getLastFocused({
+      windowTypes: ['normal', 'popup', 'app']
+    });
     if (currentWin?.id) {
       rawTabs = await chrome.tabs.query({ windowId: currentWin.id });
     } else {
@@ -104,25 +110,71 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * Move or reuse a single tab into an app window
  */
 async function moveOrReuseTab(tab, windowMode = 'popup', reuseExisting = true, isFocused = true) {
-  if (!tab) return false;
+  if (!tab || !tab.url) return false;
 
+  const activeDomains = await loadActiveDomains();
+
+  // 1. If reuse is enabled, check if an app/PWA window is already open
   if (reuseExisting) {
-    const activeDomains = await loadActiveDomains();
-    const allWindows = await chrome.windows.getAll({ populate: true });
+    const allWindows = await chrome.windows.getAll({
+      populate: true,
+      windowTypes: ['normal', 'popup', 'app']
+    });
     const existing = findExistingAppWindow(tab.url, allWindows, activeDomains);
 
     if (existing && existing.window.id !== tab.windowId) {
-      // Focus the existing app/PWA window
+      console.log(`[Open in App] Reusing open app window (${existing.window.type} #${existing.window.id}) for ${tab.url}`);
       await chrome.windows.update(existing.window.id, { focused: isFocused });
       if (existing.primaryTab?.id) {
         await chrome.tabs.update(existing.primaryTab.id, { url: tab.url, active: true });
       }
-      await chrome.tabs.remove(tab.id);
+      await chrome.tabs.remove(tab.id).catch(() => {});
       return true;
     }
   }
 
-  // Create a new window if no existing app window was found or reuse is disabled
+  // 2. Check if the app is installed as a PWA on the system
+  if (typeof chrome.management !== 'undefined' && chrome.management.getAll && chrome.management.launchApp) {
+    try {
+      const installedApps = await chrome.management.getAll();
+      const matchingPwa = findMatchingInstalledApp(tab.url, installedApps);
+
+      if (matchingPwa?.id) {
+        console.log(`[Open in App] Found installed PWA "${matchingPwa.name}" (${matchingPwa.id}). Launching via chrome.management...`);
+        const beforeWinIds = new Set(
+          (await chrome.windows.getAll({ windowTypes: ['normal', 'popup', 'app'] })).map((w) => w.id)
+        );
+
+        await chrome.management.launchApp(matchingPwa.id);
+
+        // Wait for the new native PWA window to be registered (polling up to 2.5s)
+        let newAppWin = null;
+        for (let attempt = 0; attempt < 25; attempt++) {
+          await sleep(100);
+          const currentWins = await chrome.windows.getAll({
+            populate: true,
+            windowTypes: ['normal', 'popup', 'app']
+          });
+          newAppWin = currentWins.find((w) => !beforeWinIds.has(w.id) && (w.type === 'app' || w.type === 'popup'));
+          if (newAppWin) break;
+        }
+
+        if (newAppWin) {
+          console.log(`[Open in App] PWA launched in window #${newAppWin.id}. Navigating to ${tab.url}`);
+          if (newAppWin.tabs && newAppWin.tabs.length > 0) {
+            await chrome.tabs.update(newAppWin.tabs[0].id, { url: tab.url, active: true });
+          }
+          await chrome.tabs.remove(tab.id).catch(() => {});
+          return true;
+        }
+      }
+    } catch (err) {
+      console.warn('[Open in App] PWA launch via chrome.management fallback:', err);
+    }
+  }
+
+  // 3. Fallback: Create a clean new window for the tab
+  console.log(`[Open in App] Opening new window (mode: ${windowMode}) for tab ${tab.id}`);
   await chrome.windows.create({
     tabId: tab.id,
     type: windowMode,

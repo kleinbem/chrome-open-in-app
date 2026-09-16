@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] — 2026-09-16
+
+### Added
+* **Native PWA Launch via `chrome.management`**: Automatically detects installed Progressive Web Apps (YouTube, Gmail, Calendar, etc.) and launches them through Chromium's native app manager (`chrome.management.launchApp`). This instructs Chromium to set the native OS `StartupWMClass` (Wayland/X11), allowing the app to appear on the Linux/Windows taskbar with its genuine icon and title, separate from Google Chrome!
+* **Window Type Filter Correction**: Explicitly specified `windowTypes: ['normal', 'popup', 'app']` across all `chrome.windows.getAll()` and `getLastFocused()` calls. Previously, Chromium's default filter omitted `type: 'app'` windows, preventing the extension from detecting and reusing open PWA windows.
+* **Precise Tab Targeting**: In multi-tab app windows, `findExistingAppWindow()` now targets the domain-matched tab rather than arbitrarily falling back to the first tab.
+* **Automated Test Expansion**: Added 8 new unit tests in `tests/matcher.test.js` covering `findMatchingInstalledApp()`, URL matching against installed apps, disabled app handling, and prototype pollution defenses (38/38 tests passing).
+
+---
+
 ## [1.3.0] — 2026-09-16
 
 ### Added

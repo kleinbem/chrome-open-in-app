@@ -75,6 +75,7 @@ The extension requests only the minimum necessary permissions required for its f
 | `tabs` | permissions | Required to inspect open tab URLs against user-configured app domain rules (e.g. `mail.google.com`) and obtain `tab.id` to reparent tabs into new windows without page reload. Cannot use `activeTab` alone because the core feature requires inspecting and batch-processing background/inactive tabs across the window. |
 | `storage` | permissions | Required to persist user preferences (Window Mode, Window Scope, Pinned Tab Protection, enabled presets, and custom domain rules) across browser sessions and synchronize them across the user's signed-in Chrome browsers via `chrome.storage.sync`. |
 | `contextMenus` | permissions | Required to provide right-click context menu options: "Open this Tab in App Window" on web pages, and "Open All Matching Tabs in App Windows" on the extension action icon. |
+| `management` | permissions | Required to identify installed Progressive Web Apps (PWAs) by start URL and launch them via `chrome.management.launchApp()`. This enables Chromium to assign the native OS `StartupWMClass`, displaying the application as a standalone entity with its genuine icon and title on the OS taskbar/dock. |
 
 *Note: No `<all_urls>` host permissions or script injection permissions (`scripting`) are requested or required.*
 
@@ -127,6 +128,7 @@ User settings and preferences (Window Mode, Scope, custom domains) are persisted
 
 | Version | Date | Changes | Status |
 |---|---|---|---|
+| **1.4.0** | 2026-09-16 | Added native PWA launching via `chrome.management.launchApp()` for OS taskbar integration, fixed window query filter to include `type: 'app'`, and enabled precise multi-tab targeting. | Draft |
 | **1.3.0** | 2026-09-16 | Added smart app window reuse (focusing existing PWA instances), dynamic version display in popup footer, and DevTools startup diagnostics. | Draft |
 | **1.2.0** | 2026-09-16 | Added context menus, dynamic badge counter, pinned tab protection, modular `utils/matcher.js`, automated unit & security tests, GitHub Actions CI/release automation. | Internal |
 | **1.1.0** | 2026-09-16 | Rebranded to Open in App, throttled multi-tab mover, dual window modes (Frameless App vs Dedicated Window), scope selector, tab checklist with progress bar. | Internal |

@@ -195,12 +195,68 @@ export function findExistingAppWindow(urlStr, allWindows = [], activeDomains = [
     // Recognize native PWA windows ('app') or frameless windows ('popup')
     const isAppWindow = win.type === 'app' || win.type === 'popup';
     if (isAppWindow && Array.isArray(win.tabs) && win.tabs.length > 0) {
-      const hasMatchingTab = win.tabs.some((t) => urlMatchesApp(t.url, [matchedDomain]));
-      if (hasMatchingTab) {
+      const matchingTab = win.tabs.find((t) => urlMatchesApp(t.url, [matchedDomain]));
+      if (matchingTab) {
         return {
           window: win,
-          primaryTab: win.tabs[0]
+          primaryTab: matchingTab
         };
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find an installed Progressive Web App (PWA) matching the given URL
+ * @param {string} urlStr - The URL of the tab being launched
+ * @param {Array<object>} installedApps - Array of ExtensionInfo objects from chrome.management.getAll()
+ * @returns {object|null} - Matching app object or null
+ */
+export function findMatchingInstalledApp(urlStr, installedApps = []) {
+  if (!urlStr || typeof urlStr !== 'string' || !Array.isArray(installedApps)) return null;
+  if (!urlStr.startsWith('http://') && !urlStr.startsWith('https://')) return null;
+
+  let targetHostname = '';
+  try {
+    const parsed = new URL(urlStr);
+    targetHostname = parsed.hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+
+  if (!targetHostname || DANGEROUS_KEYS.has(targetHostname)) return null;
+
+  for (const app of installedApps) {
+    if (!app || typeof app !== 'object' || app.enabled === false) continue;
+
+    // Must be a web app (hosted_app, packaged_app, or item with appLaunchUrl)
+    const isApp = app.type === 'hosted_app' || app.type === 'packaged_app' || Boolean(app.appLaunchUrl);
+    const isExtensionOrTheme = app.type === 'extension' || app.type === 'theme';
+    if (!isApp || isExtensionOrTheme) continue;
+
+    // Match via appLaunchUrl
+    if (app.appLaunchUrl && typeof app.appLaunchUrl === 'string') {
+      try {
+        const appUrl = new URL(app.appLaunchUrl);
+        const appHost = appUrl.hostname.toLowerCase();
+        if (appHost && !DANGEROUS_KEYS.has(appHost)) {
+          if (targetHostname === appHost || targetHostname.endsWith('.' + appHost) || appHost.endsWith('.' + targetHostname)) {
+            return app;
+          }
+        }
+      } catch {
+        // Ignore invalid appLaunchUrl in installed app metadata
+      }
+    }
+
+    // Secondary fallback: match via sanitized app name
+    if (app.name && typeof app.name === 'string') {
+      const cleanName = app.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const cleanHost = targetHostname.replace(/[^a-z0-9]/g, '');
+      if (cleanName.length >= 4 && cleanHost.includes(cleanName)) {
+        return app;
       }
     }
   }
