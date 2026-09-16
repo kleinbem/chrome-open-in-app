@@ -1,6 +1,6 @@
 {
   "name": "chrome-open-in-app",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Chrome Extension to batch move open tabs into standalone app windows",
   "type": "module",
   "scripts": {

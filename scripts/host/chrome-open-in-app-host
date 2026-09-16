@@ -15,12 +15,10 @@ import subprocess
 from urllib.parse import urlparse
 
 LOG_FILE = os.path.expanduser("~/.local/share/chrome-open-in-app.log")
-DEBUG_ENABLED = os.environ.get("OPEN_IN_APP_DEBUG") == "1"
 
 def log_debug(msg):
-    if not DEBUG_ENABLED:
-        return
     try:
+        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
         with open(LOG_FILE, "a", encoding="utf-8") as f:
             f.write(str(msg) + "\n")
     except Exception:
