@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tabs to PWA</title>
+  <title>Open in App</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -13,7 +13,7 @@
       <div class="logo-group">
         <img src="../icons/icon-48.png" alt="Logo" class="app-icon">
         <div>
-          <h1 class="app-title">Tabs to PWA</h1>
+          <h1 class="app-title">Open in App</h1>
           <span id="window-mode-badge" class="badge-sub">App Mode</span>
         </div>
       </div>
@@ -39,10 +39,10 @@
       <button id="scope-all-btn" class="scope-tab">All Windows</button>
     </div>
 
-    <!-- Progress Indicator (Hidden until moving) -->
+    <!-- Progress Indicator -->
     <div id="progress-container" class="progress-container">
       <div class="progress-labels">
-        <span id="progress-text">Moving tabs...</span>
+        <span id="progress-text">Opening in app...</span>
         <span id="progress-fraction">0 / 0</span>
       </div>
       <div class="progress-track">
@@ -57,7 +57,7 @@
         <div class="hero-top">
           <div class="stat-group">
             <span id="tab-count" class="stat-number">0</span>
-            <span class="stat-label">PWA Tabs Ready</span>
+            <span class="stat-label">App Tabs Ready</span>
           </div>
           <div class="shortcut-pill" title="Global keyboard shortcut">
             <span class="key">Alt</span>+<span class="key">Shift</span>+<span class="key">P</span>
@@ -70,7 +70,7 @@
             <polyline points="15 3 21 3 21 9"></polyline>
             <line x1="10" y1="14" x2="21" y2="3"></line>
           </svg>
-          <span id="btn-move-text">Move Selected Tabs (0)</span>
+          <span id="btn-move-text">Open Selected in App (0)</span>
         </button>
       </div>
 
@@ -101,7 +101,7 @@
       <!-- Window Style Section -->
       <div class="settings-section">
         <h2 class="settings-heading">Window Style</h2>
-        <p class="settings-desc">Choose how tabs are displayed when detached.</p>
+        <p class="settings-desc">Choose how tabs are displayed when opened in separate windows.</p>
         
         <div class="radio-options">
           <label class="radio-card">
@@ -122,9 +122,9 @@
         </div>
       </div>
 
-      <!-- Enabled PWAs Section -->
+      <!-- Enabled Apps Section -->
       <div class="settings-section">
-        <h2 class="settings-heading">Preset PWAs</h2>
+        <h2 class="settings-heading">Supported Apps</h2>
         <p class="settings-desc">Toggle web apps to automatically detect in open tabs.</p>
         <div id="presets-list" class="presets-grid"></div>
       </div>

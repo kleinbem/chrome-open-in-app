@@ -1,4 +1,4 @@
-// Tabs to PWA - Popup Logic v1.1.0
+// Open in App - Popup Logic v1.1.0
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Navigation elements
@@ -104,7 +104,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.action === 'PROGRESS_UPDATE') {
       const { current, total } = msg;
-      progressText.textContent = `Moving tab ${current} of ${total}...`;
+      progressText.textContent = `Opening tab ${current} of ${total} in app...`;
       progressFraction.textContent = `${current} / ${total}`;
       const pct = Math.round((current / total) * 100);
       progressFill.style.width = `${pct}%`;
@@ -124,10 +124,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (selectedCount === 0) {
       btnMoveSelected.disabled = true;
-      btnMoveText.textContent = 'Move Selected Tabs (0)';
+      btnMoveText.textContent = 'Open Selected in App (0)';
     } else {
       btnMoveSelected.disabled = false;
-      btnMoveText.textContent = `Move Selected Tabs (${selectedCount})`;
+      btnMoveText.textContent = `Open Selected in App (${selectedCount})`;
     }
   }
 
@@ -140,7 +140,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       selectedTabIds.clear();
     }
-    // Update individual checkboxes
     const checkboxes = tabsList.querySelectorAll('.tab-select-chk input');
     checkboxes.forEach((cb) => {
       cb.checked = chkSelectAll.checked;
@@ -172,7 +171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       selectedTabIds.clear();
 
       if (currentTabs.length === 0) {
-        tabsList.innerHTML = '<div class="empty-state">No matching PWA tabs found.</div>';
+        tabsList.innerHTML = '<div class="empty-state">No matching app tabs found.</div>';
         updateSelectionUI();
         setStatus(`0 matching tabs in ${currentConfig.windowScope === 'all' ? 'all windows' : 'current window'}`);
         return;
@@ -254,7 +253,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Individual popout button
     const popBtn = document.createElement('button');
     popBtn.className = 'btn-pop-tab';
-    popBtn.title = 'Move this tab to standalone window';
+    popBtn.title = 'Open this tab in app window';
     popBtn.innerHTML = `
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
@@ -277,11 +276,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         currentTabs = currentTabs.filter((t) => t.id !== tab.id);
         tabCount.textContent = String(currentTabs.length);
         updateSelectionUI();
-        setStatus('Tab moved to window');
+        setStatus('Opened in app window');
       } catch (err) {
-        console.error('Failed to move single tab:', err);
+        console.error('Failed to open tab in app:', err);
         popBtn.disabled = false;
-        setStatus('Failed to move tab', true);
+        setStatus('Failed to open in app', true);
       }
     });
 
@@ -292,7 +291,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   /**
-   * Move Selected Tabs (throttled batch move)
+   * Open Selected in App (throttled batch move)
    */
   btnMoveSelected.addEventListener('click', async () => {
     const tabIdsToMove = Array.from(selectedTabIds);
@@ -301,10 +300,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnMoveSelected.disabled = true;
     btnRefresh.disabled = true;
     progressContainer.classList.add('active');
-    progressText.textContent = `Starting batch move (${tabIdsToMove.length} tabs)...`;
+    progressText.textContent = `Opening ${tabIdsToMove.length} tabs in app...`;
     progressFraction.textContent = `0 / ${tabIdsToMove.length}`;
     progressFill.style.width = '0%';
-    setStatus('Creating standalone windows...');
+    setStatus('Opening in app windows...');
 
     try {
       const response = await chrome.runtime.sendMessage({
@@ -315,18 +314,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const count = response?.count || 0;
       progressFill.style.width = '100%';
-      progressText.textContent = `Moved ${count} tab${count !== 1 ? 's' : ''}!`;
+      progressText.textContent = `Opened ${count} tab${count !== 1 ? 's' : ''}!`;
 
       setTimeout(() => {
         progressContainer.classList.remove('active');
       }, 1500);
 
-      setStatus(`Successfully moved ${count} of ${tabIdsToMove.length} tabs!`);
+      setStatus(`Successfully opened ${count} of ${tabIdsToMove.length} tabs in app!`);
       await refreshTabs();
     } catch (err) {
-      console.error('Error in batch move:', err);
+      console.error('Error in batch open:', err);
       progressContainer.classList.remove('active');
-      setStatus('Failed to complete batch move', true);
+      setStatus('Failed to open tabs in app', true);
       btnMoveSelected.disabled = false;
       btnRefresh.disabled = false;
     }
@@ -346,7 +345,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           windowScope: response.windowScope || 'current'
         };
 
-        // Window Mode Radios
         if (currentConfig.windowMode === 'normal') {
           modeNormalRadio.checked = true;
           windowModeBadge.textContent = 'Normal Window';

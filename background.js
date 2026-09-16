@@ -1,4 +1,4 @@
-// Tabs to PWA - Production Background Service Worker (Manifest V3)
+// Open in App - Background Service Worker (Manifest V3)
 
 const DEFAULT_PRESETS = [
   { id: 'youtube', name: 'YouTube', domain: 'youtube.com', enabled: true },
@@ -22,7 +22,7 @@ const DEFAULT_PRESETS = [
 const DEFAULT_CONFIG = {
   presets: DEFAULT_PRESETS,
   customDomains: [],
-  windowMode: 'popup',   // 'popup' (frameless) or 'normal' (with toolbar & extension buttons)
+  windowMode: 'popup',   // 'popup' (frameless app window) or 'normal' (with toolbar & extension buttons)
   windowScope: 'current' // 'current' or 'all'
 };
 
@@ -41,7 +41,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 /**
- * Helper to get active domains
+ * Get active domain patterns from storage
  */
 async function getActiveDomains() {
   const data = await chrome.storage.sync.get(['presets', 'customDomains']);
@@ -63,9 +63,9 @@ async function getActiveDomains() {
 }
 
 /**
- * Check if URL matches any active domain
+ * Check if URL matches any active app domain
  */
-function urlMatchesPwa(urlStr, activeDomains) {
+function urlMatchesApp(urlStr, activeDomains) {
   if (!urlStr || !urlStr.startsWith('http')) return false;
   try {
     const parsed = new URL(urlStr);
@@ -107,28 +107,27 @@ async function getMatchingTabs(scope = 'current') {
 
   return tabsToScan.filter((tab) => {
     if (!tab.url || popupWindowIds.has(tab.windowId)) return false;
-    return urlMatchesPwa(tab.url, activeDomains);
+    return urlMatchesApp(tab.url, activeDomains);
   });
 }
 
 /**
- * Delay helper for throttling
+ * Delay helper for pacing window creations
  */
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Throttled batch tab mover: moves tabs into standalone windows sequentially
+ * Throttled batch tab mover: opens tabs into standalone windows sequentially
  * with interval pacing so Chrome and window compositors don't stutter or crash.
  */
 async function moveTabsThrottled(tabIds, windowMode = 'popup', onProgress = null) {
   let movedCount = 0;
   const total = tabIds.length;
-  const delayMs = total > 15 ? 150 : 100; // slightly longer spacing if moving 15+ tabs
+  const delayMs = total > 15 ? 150 : 100;
 
   for (let i = 0; i < total; i++) {
     const tabId = tabIds[i];
     try {
-      // Verify tab is still open
       const tab = await chrome.tabs.get(tabId).catch(() => null);
       if (tab) {
         await chrome.windows.create({
@@ -139,14 +138,13 @@ async function moveTabsThrottled(tabIds, windowMode = 'popup', onProgress = null
         movedCount++;
       }
     } catch (err) {
-      console.warn(`Could not move tab ${tabId}:`, err);
+      console.warn(`Could not open tab ${tabId} in app window:`, err);
     }
 
     if (onProgress) {
       onProgress(i + 1, total, movedCount);
     }
 
-    // Yield between window creations
     if (i < total - 1) {
       await sleep(delayMs);
     }
@@ -166,7 +164,7 @@ async function moveTabsThrottled(tabIds, windowMode = 'popup', onProgress = null
 
 // Global keyboard shortcut handler (Alt+Shift+P)
 chrome.commands.onCommand.addListener(async (command) => {
-  if (command === 'move_all_pwas') {
+  if (command === 'open_all_in_app' || command === 'move_all_pwas') {
     const config = await chrome.storage.sync.get(['windowScope', 'windowMode']);
     const scope = config.windowScope || 'current';
     const mode = config.windowMode || 'popup';
@@ -196,7 +194,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const mode = message.windowMode || 'popup';
 
           const count = await moveTabsThrottled(tabIds, mode, (current, total, moved) => {
-            // Optional progress ping to popup
             chrome.runtime.sendMessage({
               action: 'PROGRESS_UPDATE',
               current,
