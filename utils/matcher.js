@@ -1,6 +1,7 @@
 // Utility functions for domain matching, normalization, and tab filtering
+// Hardened against Prototype Pollution and Injection Attacks (ES2024)
 
-export const DEFAULT_PRESETS = [
+export const DEFAULT_PRESETS = Object.freeze([
   { id: 'youtube', name: 'YouTube', domain: 'youtube.com', enabled: true },
   { id: 'youtube_music', name: 'YouTube Music', domain: 'music.youtube.com', enabled: true },
   { id: 'gmail', name: 'Gmail', domain: 'mail.google.com', enabled: true },
@@ -17,15 +18,34 @@ export const DEFAULT_PRESETS = [
   { id: 'claude', name: 'Claude', domain: 'claude.ai', enabled: true },
   { id: 'whatsapp', name: 'WhatsApp Web', domain: 'web.whatsapp.com', enabled: true },
   { id: 'instagram', name: 'Instagram', domain: 'instagram.com', enabled: true }
-];
+]);
 
-export const DEFAULT_CONFIG = {
+export const DEFAULT_CONFIG = Object.freeze({
   presets: DEFAULT_PRESETS,
   customDomains: [],
   windowMode: 'popup',       // 'popup' (frameless) or 'normal' (with toolbars)
   windowScope: 'current',    // 'current' or 'all'
   ignorePinnedTabs: true     // whether to protect pinned tabs from batch moves
-};
+});
+
+// Dangerous keys that must never be processed to prevent Prototype Pollution
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Validates whether a domain input is safe and free from prototype injection
+ */
+export function isSafeDomain(input) {
+  if (!input || typeof input !== 'string') return false;
+  const clean = input.trim().toLowerCase();
+  if (DANGEROUS_KEYS.has(clean) || clean.includes('__proto__')) {
+    return false;
+  }
+  // Disallow javascript:, data:, and control characters
+  if (/[\s<>'"`;\\|&]/.test(clean)) {
+    return false;
+  }
+  return true;
+}
 
 /**
  * Clean and normalize a user-entered domain or URL
@@ -35,7 +55,7 @@ export const DEFAULT_CONFIG = {
  *   "   github.com:443  " -> "github.com"
  */
 export function normalizeDomain(input) {
-  if (!input || typeof input !== 'string') return '';
+  if (!isSafeDomain(input)) return '';
   let str = input.trim().toLowerCase();
 
   // If missing protocol but has slash or port, prepend https:// for URL parsing
@@ -45,14 +65,20 @@ export function normalizeDomain(input) {
 
   try {
     const parsed = new URL(str);
-    return parsed.hostname.toLowerCase();
+    // Enforce strict HTTP/HTTPS protocol
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return '';
+    }
+    const hostname = parsed.hostname.toLowerCase();
+    return DANGEROUS_KEYS.has(hostname) ? '' : hostname;
   } catch {
-    // Fallback: strip protocols and paths manually
-    return str
+    // Fallback manual sanitizer
+    const fallback = str
       .replace(/^https?:\/\//, '')
       .split('/')[0]
       .split(':')[0]
       .trim();
+    return DANGEROUS_KEYS.has(fallback) ? '' : fallback;
   }
 }
 
@@ -62,19 +88,23 @@ export function normalizeDomain(input) {
 export function getActiveDomains(presets = [], customDomains = []) {
   const active = [];
 
-  for (const p of presets) {
-    if (p && p.enabled !== false && p.domain) {
-      active.push(normalizeDomain(p.domain));
+  if (Array.isArray(presets)) {
+    for (const p of presets) {
+      if (p && p.enabled !== false && p.domain && isSafeDomain(p.domain)) {
+        active.push(normalizeDomain(p.domain));
+      }
     }
   }
 
-  for (const c of customDomains) {
-    const domainStr = typeof c === 'string' ? c : c?.domain;
-    const isEnabled = typeof c === 'object' ? c?.enabled !== false : true;
-    if (isEnabled && domainStr) {
-      const normalized = normalizeDomain(domainStr);
-      if (normalized && !active.includes(normalized)) {
-        active.push(normalized);
+  if (Array.isArray(customDomains)) {
+    for (const c of customDomains) {
+      const domainStr = typeof c === 'string' ? c : c?.domain;
+      const isEnabled = typeof c === 'object' && c !== null ? c.enabled !== false : true;
+      if (isEnabled && domainStr && isSafeDomain(domainStr)) {
+        const normalized = normalizeDomain(domainStr);
+        if (normalized && !active.includes(normalized)) {
+          active.push(normalized);
+        }
       }
     }
   }
@@ -83,14 +113,22 @@ export function getActiveDomains(presets = [], customDomains = []) {
 }
 
 /**
- * Check if a URL string matches any of the active domain patterns
+ * Check if a URL string matches any of the active domain patterns.
+ * Strictly requires http: or https: protocols, rejecting javascript:, data:, file:, etc.
  */
 export function urlMatchesApp(urlStr, activeDomains = []) {
   if (!urlStr || typeof urlStr !== 'string') return false;
-  if (!urlStr.startsWith('http://') && !urlStr.startsWith('https://')) return false;
+
+  // Fast pre-filter for performance and security
+  if (!urlStr.startsWith('http://') && !urlStr.startsWith('https://')) {
+    return false;
+  }
 
   try {
     const parsed = new URL(urlStr);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return false;
+    }
     const hostname = parsed.hostname.toLowerCase();
 
     return activeDomains.some((d) => {
@@ -109,13 +147,16 @@ export function urlMatchesApp(urlStr, activeDomains = []) {
  *   - popupWindowIds (Set<number>)
  */
 export function filterEligibleTabs(tabs = [], activeDomains = [], options = {}) {
-  const { ignorePinned = true, popupWindowIds = new Set() } = options;
+  const ignorePinned = options.ignorePinned !== false;
+  const popupWindowIds = options.popupWindowIds || new Set();
+
+  if (!Array.isArray(tabs)) return [];
 
   return tabs.filter((tab) => {
     if (!tab || !tab.url) return false;
-    // Skip internal browser schemes
+    // Protocol check
     if (!tab.url.startsWith('http://') && !tab.url.startsWith('https://')) return false;
-    // Skip pinned tabs if protection enabled
+    // Pinned tab protection
     if (ignorePinned && tab.pinned) return false;
     // Skip tabs already in popup windows
     if (tab.windowId && popupWindowIds.has(tab.windowId)) return false;

@@ -1,6 +1,6 @@
-// Open in App - Popup Logic v1.2.0 (ES Module)
+// Open in App - Popup Logic v1.2.0 (Hardened against XSS)
 
-import { normalizeDomain } from '../utils/matcher.js';
+import { normalizeDomain, isSafeDomain } from '../utils/matcher.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Navigation elements
@@ -51,7 +51,80 @@ document.addEventListener('DOMContentLoaded', async () => {
   const selectedTabIds = new Set();
 
   /**
-   * Helper to set footer status message
+   * Safe DOM Helper: Clears all child nodes without innerHTML
+   */
+  function clearElement(el) {
+    while (el.firstChild) {
+      el.removeChild(el.firstChild);
+    }
+  }
+
+  /**
+   * Safe DOM Helper: Displays text state placeholder
+   */
+  function showPlaceholder(container, text, className = 'empty-state') {
+    clearElement(container);
+    const div = document.createElement('div');
+    div.className = className;
+    div.textContent = text;
+    container.appendChild(div);
+  }
+
+  /**
+   * Safe DOM Helper: Creates SVG Popout icon
+   */
+  function createPopoutSvgIcon() {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '13');
+    svg.setAttribute('height', '13');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6');
+
+    const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    polyline.setAttribute('points', '15 3 21 3 21 9');
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', '10');
+    line.setAttribute('y1', '14');
+    line.setAttribute('x2', '21');
+    line.setAttribute('y2', '3');
+
+    svg.appendChild(path);
+    svg.appendChild(polyline);
+    svg.appendChild(line);
+    return svg;
+  }
+
+  /**
+   * Safe DOM Helper: Creates SVG Delete icon
+   */
+  function createTrashSvgIcon() {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '13');
+    svg.setAttribute('height', '13');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+
+    const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    polyline.setAttribute('points', '3 6 5 6 21 6');
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2');
+
+    svg.appendChild(polyline);
+    svg.appendChild(path);
+    return svg;
+  }
+
+  /**
+   * Status message helper
    */
   function setStatus(text, isError = false) {
     statusMessage.textContent = text;
@@ -59,7 +132,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   /**
-   * View navigation
+   * Navigation listeners
    */
   navTabsBtn.addEventListener('click', () => {
     navTabsBtn.classList.add('active');
@@ -103,7 +176,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   /**
-   * Listen for background progress messages during throttled batch move
+   * Progress message listener
    */
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.action === 'PROGRESS_UPDATE') {
@@ -116,7 +189,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   /**
-   * Update selection counters and main CTA button
+   * Update selection counter
    */
   function updateSelectionUI() {
     const totalVisible = currentTabs.length;
@@ -135,9 +208,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  /**
-   * Master Select All toggle
-   */
   chkSelectAll.addEventListener('change', () => {
     if (chkSelectAll.checked) {
       currentTabs.forEach((t) => selectedTabIds.add(t.id));
@@ -152,10 +222,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   /**
-   * Refresh tabs from background
+   * Refresh tabs from background worker
    */
   async function refreshTabs() {
-    tabsList.innerHTML = '<div class="loading-state">Scanning open tabs...</div>';
+    showPlaceholder(tabsList, 'Scanning open tabs...', 'loading-state');
     btnMoveSelected.disabled = true;
 
     try {
@@ -165,7 +235,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
 
       if (!response || !response.success) {
-        tabsList.innerHTML = '<div class="empty-state">Failed to scan tabs</div>';
+        showPlaceholder(tabsList, 'Failed to scan tabs', 'empty-state');
         setStatus('Failed to scan tabs', true);
         return;
       }
@@ -175,16 +245,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       selectedTabIds.clear();
 
       if (currentTabs.length === 0) {
-        tabsList.innerHTML = '<div class="empty-state">No matching app tabs found.</div>';
+        showPlaceholder(tabsList, 'No matching app tabs found.', 'empty-state');
         updateSelectionUI();
         setStatus(`0 matching tabs in ${currentConfig.windowScope === 'all' ? 'all windows' : 'current window'}`);
         return;
       }
 
-      // Pre-select all tabs by default
       currentTabs.forEach((t) => selectedTabIds.add(t.id));
+      clearElement(tabsList);
 
-      tabsList.innerHTML = '';
       for (const tab of currentTabs) {
         const item = createTabItemElement(tab);
         tabsList.appendChild(item);
@@ -194,13 +263,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       setStatus(`Detected ${currentTabs.length} matching tab${currentTabs.length > 1 ? 's' : ''}`);
     } catch (err) {
       console.error('Error refreshing tabs:', err);
-      tabsList.innerHTML = '<div class="empty-state">Error scanning tabs</div>';
+      showPlaceholder(tabsList, 'Error scanning tabs', 'empty-state');
       setStatus('Error scanning tabs', true);
     }
   }
 
   /**
-   * Create tab row DOM element with selection checkbox
+   * Create tab row DOM element safely without innerHTML
    */
   function createTabItemElement(tab) {
     const card = document.createElement('div');
@@ -223,7 +292,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     chkWrap.appendChild(chk);
 
-    // Tab details
+    // Tab info
     const info = document.createElement('div');
     info.className = 'tab-info';
 
@@ -254,17 +323,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     info.appendChild(icon);
     info.appendChild(textWrap);
 
-    // Individual popout button
+    // Popout button
     const popBtn = document.createElement('button');
     popBtn.className = 'btn-pop-tab';
     popBtn.title = 'Open this tab in app window';
-    popBtn.innerHTML = `
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-        <polyline points="15 3 21 3 21 9"></polyline>
-        <line x1="10" y1="14" x2="21" y2="3"></line>
-      </svg>
-    `;
+    popBtn.appendChild(createPopoutSvgIcon());
 
     popBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -295,7 +358,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   /**
-   * Open Selected in App (throttled batch move)
+   * Batch open selected tabs
    */
   btnMoveSelected.addEventListener('click', async () => {
     const tabIdsToMove = Array.from(selectedTabIds);
@@ -336,7 +399,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   /**
-   * Load and render configuration
+   * Settings Loader
    */
   async function loadSettings() {
     try {
@@ -369,7 +432,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Window mode radio change listeners
   modePopupRadio.addEventListener('change', async () => {
     if (modePopupRadio.checked) {
       currentConfig.windowMode = 'popup';
@@ -386,14 +448,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Pinned tabs protection listener
   chkIgnorePinned.addEventListener('change', async () => {
     currentConfig.ignorePinnedTabs = chkIgnorePinned.checked;
     await saveConfig({ ignorePinnedTabs: chkIgnorePinned.checked });
   });
 
   function renderPresets() {
-    presetsList.innerHTML = '';
+    clearElement(presetsList);
     for (const preset of currentConfig.presets) {
       const item = document.createElement('div');
       item.className = 'preset-item';
@@ -437,9 +498,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function renderCustomDomains() {
-    customDomainsList.innerHTML = '';
+    clearElement(customDomainsList);
     if (currentConfig.customDomains.length === 0) {
-      customDomainsList.innerHTML = '<div style="font-size: 11px; color: var(--text-muted); padding: 4px 0;">No custom domains added.</div>';
+      const emptyNote = document.createElement('div');
+      emptyNote.style.fontSize = '11px';
+      emptyNote.style.color = 'var(--text-muted)';
+      emptyNote.style.padding = '4px 0';
+      emptyNote.textContent = 'No custom domains added.';
+      customDomainsList.appendChild(emptyNote);
       return;
     }
 
@@ -447,19 +513,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       const item = document.createElement('div');
       item.className = 'custom-domain-item';
 
-      const domainStr = typeof domainItem === 'string' ? domainItem : domainItem.domain;
+      const domainStr = typeof domainItem === 'string' ? domainItem : domainItem?.domain;
       const name = document.createElement('span');
       name.textContent = domainStr;
 
       const delBtn = document.createElement('button');
       delBtn.className = 'btn-delete-custom';
       delBtn.title = 'Remove domain';
-      delBtn.innerHTML = `
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="3 6 5 6 21 6"></polyline>
-          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-        </svg>
-      `;
+      delBtn.appendChild(createTrashSvgIcon());
 
       delBtn.addEventListener('click', async () => {
         currentConfig.customDomains.splice(index, 1);
@@ -475,11 +536,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   formAddCustom.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const clean = normalizeDomain(inputCustomDomain.value);
-    if (!clean) return;
+    const rawVal = inputCustomDomain.value;
+    if (!isSafeDomain(rawVal)) {
+      setStatus('Invalid or unsafe domain name', true);
+      return;
+    }
+
+    const clean = normalizeDomain(rawVal);
+    if (!clean) {
+      setStatus('Please enter a valid domain', true);
+      return;
+    }
 
     const exists = currentConfig.customDomains.some((c) => {
-      const d = typeof c === 'string' ? c : c.domain;
+      const d = typeof c === 'string' ? c : c?.domain;
       return normalizeDomain(d) === clean;
     });
 

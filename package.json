@@ -4,15 +4,23 @@
   "description": "Chrome Extension to batch move open tabs into standalone app windows",
   "type": "module",
   "scripts": {
-    "test": "node --test 'tests/**/*.test.js'"
+    "test": "node --test 'tests/**/*.test.js'",
+    "lint": "eslint .",
+    "check": "node --check background.js popup/popup.js utils/matcher.js",
+    "validate": "npm run check && npm run lint && npm test"
   },
   "keywords": [
     "chrome-extension",
     "pwa",
     "app",
     "tabs",
-    "productivity"
+    "productivity",
+    "security"
   ],
   "author": "kleinbem",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@types/chrome": "^0.3.0",
+    "eslint": "^10.10.0"
+  }
 }
