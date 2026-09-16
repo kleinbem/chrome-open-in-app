@@ -1,25 +1,62 @@
-// Tabs to PWA - Popup Logic
+// Tabs to PWA - Popup Logic v1.1.0
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Elements
+  // Navigation elements
   const navTabsBtn = document.getElementById('nav-tabs-btn');
   const navSettingsBtn = document.getElementById('nav-settings-btn');
   const viewTabs = document.getElementById('view-tabs');
   const viewSettings = document.getElementById('view-settings');
+  const windowModeBadge = document.getElementById('window-mode-badge');
+
+  // Scope buttons
+  const scopeCurrentBtn = document.getElementById('scope-current-btn');
+  const scopeAllBtn = document.getElementById('scope-all-btn');
+
+  // Tabs view elements
   const tabsList = document.getElementById('tabs-list');
   const tabCount = document.getElementById('tab-count');
-  const btnMoveAll = document.getElementById('btn-move-all');
-  const btnMoveAllText = document.getElementById('btn-move-all-text');
-  const chkAllWindows = document.getElementById('chk-all-windows');
+  const btnMoveSelected = document.getElementById('btn-move-selected');
+  const btnMoveText = document.getElementById('btn-move-text');
+  const chkSelectAll = document.getElementById('chk-select-all');
+  const selectionCountText = document.getElementById('selection-count-text');
+  const btnRefresh = document.getElementById('btn-refresh');
+
+  // Progress elements
+  const progressContainer = document.getElementById('progress-container');
+  const progressText = document.getElementById('progress-text');
+  const progressFraction = document.getElementById('progress-fraction');
+  const progressFill = document.getElementById('progress-fill');
+
+  // Settings view elements
+  const modePopupRadio = document.getElementById('mode-popup');
+  const modeNormalRadio = document.getElementById('mode-normal');
   const presetsList = document.getElementById('presets-list');
   const customDomainsList = document.getElementById('custom-domains-list');
   const formAddCustom = document.getElementById('form-add-custom');
   const inputCustomDomain = document.getElementById('input-custom-domain');
   const statusMessage = document.getElementById('status-message');
 
-  let currentConfig = { presets: [], customDomains: [] };
+  // State
+  let currentConfig = {
+    presets: [],
+    customDomains: [],
+    windowMode: 'popup',
+    windowScope: 'current'
+  };
+  let currentTabs = [];
+  const selectedTabIds = new Set();
 
-  // View navigation
+  /**
+   * Helper to set footer status message
+   */
+  function setStatus(text, isError = false) {
+    statusMessage.textContent = text;
+    statusMessage.style.color = isError ? 'var(--danger)' : 'var(--text-muted)';
+  }
+
+  /**
+   * View navigation
+   */
   navTabsBtn.addEventListener('click', () => {
     navTabsBtn.classList.add('active');
     navSettingsBtn.classList.remove('active');
@@ -36,71 +73,154 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadSettings();
   });
 
-  chkAllWindows.addEventListener('change', () => {
+  /**
+   * Scope toggling (Current Window vs All Windows)
+   */
+  scopeCurrentBtn.addEventListener('click', async () => {
+    if (currentConfig.windowScope === 'current') return;
+    scopeCurrentBtn.classList.add('active');
+    scopeAllBtn.classList.remove('active');
+    currentConfig.windowScope = 'current';
+    await saveConfig({ windowScope: 'current' });
+    await refreshTabs();
+  });
+
+  scopeAllBtn.addEventListener('click', async () => {
+    if (currentConfig.windowScope === 'all') return;
+    scopeAllBtn.classList.add('active');
+    scopeCurrentBtn.classList.remove('active');
+    currentConfig.windowScope = 'all';
+    await saveConfig({ windowScope: 'all' });
+    await refreshTabs();
+  });
+
+  btnRefresh.addEventListener('click', () => {
     refreshTabs();
   });
 
   /**
-   * Status display helper
+   * Listen for background progress messages during throttled batch move
    */
-  function setStatus(text, isError = false) {
-    statusMessage.textContent = text;
-    statusMessage.style.color = isError ? 'var(--danger)' : 'var(--text-muted)';
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.action === 'PROGRESS_UPDATE') {
+      const { current, total } = msg;
+      progressText.textContent = `Moving tab ${current} of ${total}...`;
+      progressFraction.textContent = `${current} / ${total}`;
+      const pct = Math.round((current / total) * 100);
+      progressFill.style.width = `${pct}%`;
+    }
+  });
+
+  /**
+   * Update selection counters and main CTA button
+   */
+  function updateSelectionUI() {
+    const totalVisible = currentTabs.length;
+    const selectedCount = selectedTabIds.size;
+
+    selectionCountText.textContent = `${selectedCount} of ${totalVisible} selected`;
+    chkSelectAll.checked = totalVisible > 0 && selectedCount === totalVisible;
+    chkSelectAll.indeterminate = selectedCount > 0 && selectedCount < totalVisible;
+
+    if (selectedCount === 0) {
+      btnMoveSelected.disabled = true;
+      btnMoveText.textContent = 'Move Selected Tabs (0)';
+    } else {
+      btnMoveSelected.disabled = false;
+      btnMoveText.textContent = `Move Selected Tabs (${selectedCount})`;
+    }
   }
 
   /**
-   * Refresh matching tabs
+   * Master Select All toggle
+   */
+  chkSelectAll.addEventListener('change', () => {
+    if (chkSelectAll.checked) {
+      currentTabs.forEach((t) => selectedTabIds.add(t.id));
+    } else {
+      selectedTabIds.clear();
+    }
+    // Update individual checkboxes
+    const checkboxes = tabsList.querySelectorAll('.tab-select-chk input');
+    checkboxes.forEach((cb) => {
+      cb.checked = chkSelectAll.checked;
+    });
+    updateSelectionUI();
+  });
+
+  /**
+   * Refresh tabs from background
    */
   async function refreshTabs() {
     tabsList.innerHTML = '<div class="loading-state">Scanning open tabs...</div>';
-    try {
-      const currentWin = await chrome.windows.getCurrent();
-      const windowId = chkAllWindows.checked ? null : currentWin.id;
+    btnMoveSelected.disabled = true;
 
+    try {
       const response = await chrome.runtime.sendMessage({
         action: 'GET_MATCHING_TABS',
-        windowId
+        scope: currentConfig.windowScope
       });
 
       if (!response || !response.success) {
         tabsList.innerHTML = '<div class="empty-state">Failed to scan tabs</div>';
+        setStatus('Failed to scan tabs', true);
         return;
       }
 
-      const tabs = response.tabs || [];
-      tabCount.textContent = String(tabs.length);
+      currentTabs = response.tabs || [];
+      tabCount.textContent = String(currentTabs.length);
+      selectedTabIds.clear();
 
-      if (tabs.length === 0) {
-        tabsList.innerHTML = '<div class="empty-state">No matching PWA tabs found in this window.</div>';
-        btnMoveAll.disabled = true;
-        btnMoveAllText.textContent = 'Move All to PWA Windows';
-        setStatus('No matching tabs found');
+      if (currentTabs.length === 0) {
+        tabsList.innerHTML = '<div class="empty-state">No matching PWA tabs found.</div>';
+        updateSelectionUI();
+        setStatus(`0 matching tabs in ${currentConfig.windowScope === 'all' ? 'all windows' : 'current window'}`);
         return;
       }
 
-      btnMoveAll.disabled = false;
-      btnMoveAllText.textContent = `Move All to PWA Windows (${tabs.length})`;
+      // Pre-select all tabs by default
+      currentTabs.forEach((t) => selectedTabIds.add(t.id));
+
       tabsList.innerHTML = '';
-
-      for (const tab of tabs) {
+      for (const tab of currentTabs) {
         const item = createTabItemElement(tab);
         tabsList.appendChild(item);
       }
-      setStatus(`Detected ${tabs.length} eligible tab${tabs.length > 1 ? 's' : ''}`);
+
+      updateSelectionUI();
+      setStatus(`Detected ${currentTabs.length} matching tab${currentTabs.length > 1 ? 's' : ''}`);
     } catch (err) {
       console.error('Error refreshing tabs:', err);
-      tabsList.innerHTML = '<div class="empty-state">Error loading tabs</div>';
+      tabsList.innerHTML = '<div class="empty-state">Error scanning tabs</div>';
       setStatus('Error scanning tabs', true);
     }
   }
 
   /**
-   * Create tab row DOM element
+   * Create tab row DOM element with selection checkbox
    */
   function createTabItemElement(tab) {
     const card = document.createElement('div');
     card.className = 'tab-card';
 
+    // Checkbox
+    const chkWrap = document.createElement('label');
+    chkWrap.className = 'tab-select-chk checkbox-container';
+    const chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.checked = selectedTabIds.has(tab.id);
+
+    chk.addEventListener('change', () => {
+      if (chk.checked) {
+        selectedTabIds.add(tab.id);
+      } else {
+        selectedTabIds.delete(tab.id);
+      }
+      updateSelectionUI();
+    });
+    chkWrap.appendChild(chk);
+
+    // Tab details
     const info = document.createElement('div');
     info.className = 'tab-info';
 
@@ -131,11 +251,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     info.appendChild(icon);
     info.appendChild(textWrap);
 
+    // Individual popout button
     const popBtn = document.createElement('button');
     popBtn.className = 'btn-pop-tab';
-    popBtn.title = 'Move this tab to PWA window';
+    popBtn.title = 'Move this tab to standalone window';
     popBtn.innerHTML = `
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
         <polyline points="15 3 21 3 21 9"></polyline>
         <line x1="10" y1="14" x2="21" y2="3"></line>
@@ -147,52 +268,72 @@ document.addEventListener('DOMContentLoaded', async () => {
       popBtn.disabled = true;
       try {
         await chrome.runtime.sendMessage({
-          action: 'MOVE_TAB',
-          tabId: tab.id
+          action: 'MOVE_SINGLE_TAB',
+          tabId: tab.id,
+          windowMode: currentConfig.windowMode
         });
         card.remove();
-        await refreshTabs();
+        selectedTabIds.delete(tab.id);
+        currentTabs = currentTabs.filter((t) => t.id !== tab.id);
+        tabCount.textContent = String(currentTabs.length);
+        updateSelectionUI();
+        setStatus('Tab moved to window');
       } catch (err) {
-        console.error('Failed to move tab:', err);
+        console.error('Failed to move single tab:', err);
         popBtn.disabled = false;
+        setStatus('Failed to move tab', true);
       }
     });
 
+    card.appendChild(chkWrap);
     card.appendChild(info);
     card.appendChild(popBtn);
     return card;
   }
 
   /**
-   * Move All button click
+   * Move Selected Tabs (throttled batch move)
    */
-  btnMoveAll.addEventListener('click', async () => {
-    btnMoveAll.disabled = true;
-    btnMoveAllText.textContent = 'Moving tabs...';
+  btnMoveSelected.addEventListener('click', async () => {
+    const tabIdsToMove = Array.from(selectedTabIds);
+    if (tabIdsToMove.length === 0) return;
+
+    btnMoveSelected.disabled = true;
+    btnRefresh.disabled = true;
+    progressContainer.classList.add('active');
+    progressText.textContent = `Starting batch move (${tabIdsToMove.length} tabs)...`;
+    progressFraction.textContent = `0 / ${tabIdsToMove.length}`;
+    progressFill.style.width = '0%';
     setStatus('Creating standalone windows...');
 
     try {
-      const currentWin = await chrome.windows.getCurrent();
-      const windowId = chkAllWindows.checked ? null : currentWin.id;
-
       const response = await chrome.runtime.sendMessage({
-        action: 'MOVE_ALL_TABS',
-        windowId
+        action: 'MOVE_TABS',
+        tabIds: tabIdsToMove,
+        windowMode: currentConfig.windowMode
       });
 
       const count = response?.count || 0;
-      setStatus(`Moved ${count} tab${count !== 1 ? 's' : ''} to PWA windows!`);
+      progressFill.style.width = '100%';
+      progressText.textContent = `Moved ${count} tab${count !== 1 ? 's' : ''}!`;
+
+      setTimeout(() => {
+        progressContainer.classList.remove('active');
+      }, 1500);
+
+      setStatus(`Successfully moved ${count} of ${tabIdsToMove.length} tabs!`);
       await refreshTabs();
     } catch (err) {
-      console.error('Error moving all tabs:', err);
-      setStatus('Failed to move tabs', true);
-      btnMoveAll.disabled = false;
-      btnMoveAllText.textContent = 'Move All to PWA Windows';
+      console.error('Error in batch move:', err);
+      progressContainer.classList.remove('active');
+      setStatus('Failed to complete batch move', true);
+      btnMoveSelected.disabled = false;
+      btnRefresh.disabled = false;
     }
   });
 
   /**
-   * Load and render settings
+   * Load and render configuration
    */
   async function loadSettings() {
     try {
@@ -200,8 +341,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (response && response.success) {
         currentConfig = {
           presets: response.presets || [],
-          customDomains: response.customDomains || []
+          customDomains: response.customDomains || [],
+          windowMode: response.windowMode || 'popup',
+          windowScope: response.windowScope || 'current'
         };
+
+        // Window Mode Radios
+        if (currentConfig.windowMode === 'normal') {
+          modeNormalRadio.checked = true;
+          windowModeBadge.textContent = 'Normal Window';
+        } else {
+          modePopupRadio.checked = true;
+          windowModeBadge.textContent = 'App Mode';
+        }
+
         renderPresets();
         renderCustomDomains();
       }
@@ -210,6 +363,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       setStatus('Failed to load settings', true);
     }
   }
+
+  // Window mode radio change listeners
+  modePopupRadio.addEventListener('change', async () => {
+    if (modePopupRadio.checked) {
+      currentConfig.windowMode = 'popup';
+      windowModeBadge.textContent = 'App Mode';
+      await saveConfig({ windowMode: 'popup' });
+    }
+  });
+
+  modeNormalRadio.addEventListener('change', async () => {
+    if (modeNormalRadio.checked) {
+      currentConfig.windowMode = 'normal';
+      windowModeBadge.textContent = 'Normal Window';
+      await saveConfig({ windowMode: 'normal' });
+    }
+  });
 
   function renderPresets() {
     presetsList.innerHTML = '';
@@ -243,7 +413,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       input.addEventListener('change', async () => {
         preset.enabled = input.checked;
-        await saveConfig();
+        await saveConfig({ presets: currentConfig.presets });
       });
 
       toggleWrap.appendChild(input);
@@ -266,14 +436,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       const item = document.createElement('div');
       item.className = 'custom-domain-item';
 
+      const domainStr = typeof domainItem === 'string' ? domainItem : domainItem.domain;
       const name = document.createElement('span');
-      name.textContent = typeof domainItem === 'string' ? domainItem : domainItem.domain;
+      name.textContent = domainStr;
 
       const delBtn = document.createElement('button');
       delBtn.className = 'btn-delete-custom';
       delBtn.title = 'Remove domain';
       delBtn.innerHTML = `
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="3 6 5 6 21 6"></polyline>
           <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
         </svg>
@@ -281,7 +452,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       delBtn.addEventListener('click', async () => {
         currentConfig.customDomains.splice(index, 1);
-        await saveConfig();
+        await saveConfig({ customDomains: currentConfig.customDomains });
         renderCustomDomains();
       });
 
@@ -296,7 +467,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     let val = inputCustomDomain.value.trim().toLowerCase();
     if (!val) return;
 
-    // Strip http/https/slashes if user entered a full URL
     try {
       if (val.startsWith('http://') || val.startsWith('https://')) {
         val = new URL(val).hostname;
@@ -314,21 +484,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!exists) {
       currentConfig.customDomains.push({ domain: val, enabled: true });
-      await saveConfig();
+      await saveConfig({ customDomains: currentConfig.customDomains });
       renderCustomDomains();
       inputCustomDomain.value = '';
-      setStatus(`Added domain: ${val}`);
+      setStatus(`Added: ${val}`);
     } else {
       setStatus('Domain already exists');
     }
   });
 
-  async function saveConfig() {
+  async function saveConfig(updates) {
     try {
       await chrome.runtime.sendMessage({
         action: 'SAVE_CONFIG',
-        presets: currentConfig.presets,
-        customDomains: currentConfig.customDomains
+        ...updates
       });
       setStatus('Settings saved');
     } catch (err) {
@@ -337,6 +506,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Initial load
+  // Initialize
+  const initialConfig = await chrome.runtime.sendMessage({ action: 'GET_CONFIG' });
+  if (initialConfig?.success) {
+    currentConfig = {
+      presets: initialConfig.presets || [],
+      customDomains: initialConfig.customDomains || [],
+      windowMode: initialConfig.windowMode || 'popup',
+      windowScope: initialConfig.windowScope || 'current'
+    };
+    if (currentConfig.windowScope === 'all') {
+      scopeAllBtn.classList.add('active');
+      scopeCurrentBtn.classList.remove('active');
+    } else {
+      scopeCurrentBtn.classList.add('active');
+      scopeAllBtn.classList.remove('active');
+    }
+
+    if (currentConfig.windowMode === 'normal') {
+      windowModeBadge.textContent = 'Normal Window';
+    } else {
+      windowModeBadge.textContent = 'App Mode';
+    }
+  }
+
   await refreshTabs();
 });
