@@ -18,6 +18,7 @@ Open in App gives you the missing Chrome superpower: batch-moving all your open 
 Key Highlights & Architecture:
 - 1-Click Batch Open: Scans open tabs across your current window or all windows, and opens matching tabs into separate windows simultaneously.
 - Context Menu Integration: Right-click on any page to open that tab into an app window, or right-click the extension icon to trigger a full batch move.
+- Smart App Window Reuse: Automatically detects if an installed PWA or app window for that domain is already open, focuses it, navigates to the URL, and closes the browser tab instead of spawning duplicate windows.
 - Pinned Tab Protection: Automatically preserves pinned tabs so your permanently docked tabs are never accidentally moved.
 - Dynamic Badge Counter: Live badge on the extension icon shows exactly how many app tabs are open in your browser.
 - Smooth Multi-Tab Throttling: Built with an asynchronous, throttled queue engine that spaces window creation to prevent browser freezes, compositor stutter, or window manager lag when moving 20+ tabs.
@@ -126,7 +127,7 @@ User settings and preferences (Window Mode, Scope, custom domains) are persisted
 
 | Version | Date | Changes | Status |
 |---|---|---|---|
-| **1.2.0** | 2026-09-16 | Added context menus, dynamic badge counter, pinned tab protection, modular `utils/matcher.js`, automated unit & security tests, GitHub Actions CI/release automation. | Draft |
+| **1.2.0** | 2026-09-16 | Added context menus, dynamic badge counter, pinned tab protection, smart app window reuse (focusing existing PWA instances), modular `utils/matcher.js`, automated unit & security tests, GitHub Actions CI/release automation. | Draft |
 | **1.1.0** | 2026-09-16 | Rebranded to Open in App, throttled multi-tab mover, dual window modes (Frameless App vs Dedicated Window), scope selector, tab checklist with progress bar. | Internal |
 | **1.0.0** | 2026-09-16 | Initial Manifest V3 implementation with 1-click batch popout, 16 presets, and Alt+Shift+P shortcut. | Internal |
 
@@ -139,5 +140,5 @@ The extension strictly adheres to the Single Purpose policy: its single and excl
 
 ### Known Edge Cases Handled
 * **Internal Tabs:** Tabs with URLs like `chrome://`, `chrome-extension://`, `devtools://`, `edge://`, `about:blank` are strictly ignored and never detached.
-* **Already Detached Windows:** Tabs already residing in popup windows (`type: "popup"`) are automatically excluded to prevent redundant window creation loops.
+* **Already Open PWA Instances:** When a native PWA or app window for the domain is already running (`win.type === 'app'` or `'popup'`), the extension activates and focuses the existing window, navigates it to the requested tab URL, and removes the duplicate browser tab rather than creating redundant windows.
 * **Compositor Lag & Heavy Tab Sets:** Batch moves space window creation by 100–150ms using an asynchronous throttled queue to ensure Chrome does not freeze or drop frames when moving 20+ tabs.

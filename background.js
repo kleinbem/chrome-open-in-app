@@ -3,6 +3,7 @@
 import {
   getActiveDomains,
   filterEligibleTabs,
+  findExistingAppWindow,
   DEFAULT_CONFIG
 } from './utils/matcher.js';
 
@@ -13,7 +14,8 @@ chrome.runtime.onInstalled.addListener(async () => {
     'customDomains',
     'windowMode',
     'windowScope',
-    'ignorePinnedTabs'
+    'ignorePinnedTabs',
+    'reuseExistingAppWindow'
   ]);
 
   const updates = {};
@@ -22,6 +24,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!existing.windowMode) updates.windowMode = DEFAULT_CONFIG.windowMode;
   if (!existing.windowScope) updates.windowScope = DEFAULT_CONFIG.windowScope;
   if (existing.ignorePinnedTabs === undefined) updates.ignorePinnedTabs = DEFAULT_CONFIG.ignorePinnedTabs;
+  if (existing.reuseExistingAppWindow === undefined) updates.reuseExistingAppWindow = DEFAULT_CONFIG.reuseExistingAppWindow;
 
   if (Object.keys(updates).length > 0) {
     await chrome.storage.sync.set(updates);
@@ -66,7 +69,7 @@ async function getMatchingTabs(scope = 'current') {
   const allWindows = await chrome.windows.getAll({ populate: true });
   const popupWindowIds = new Set();
   for (const win of allWindows) {
-    if (win.type === 'popup' || (win.tabs && win.tabs.length === 1 && win.type === 'popup')) {
+    if (win.type === 'popup' || win.type === 'app' || (win.tabs && win.tabs.length === 1 && win.type === 'popup')) {
       popupWindowIds.add(win.id);
     }
   }
@@ -95,24 +98,53 @@ async function getMatchingTabs(scope = 'current') {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * Move or reuse a single tab into an app window
+ */
+async function moveOrReuseTab(tab, windowMode = 'popup', reuseExisting = true, isFocused = true) {
+  if (!tab) return false;
+
+  if (reuseExisting) {
+    const activeDomains = await loadActiveDomains();
+    const allWindows = await chrome.windows.getAll({ populate: true });
+    const existing = findExistingAppWindow(tab.url, allWindows, activeDomains);
+
+    if (existing && existing.window.id !== tab.windowId) {
+      // Focus the existing app/PWA window
+      await chrome.windows.update(existing.window.id, { focused: isFocused });
+      if (existing.primaryTab?.id) {
+        await chrome.tabs.update(existing.primaryTab.id, { url: tab.url, active: true });
+      }
+      await chrome.tabs.remove(tab.id);
+      return true;
+    }
+  }
+
+  // Create a new window if no existing app window was found or reuse is disabled
+  await chrome.windows.create({
+    tabId: tab.id,
+    type: windowMode,
+    focused: isFocused
+  });
+  return true;
+}
+
+/**
  * Throttled batch tab mover
  */
 async function moveTabsThrottled(tabIds, windowMode = 'popup', onProgress = null) {
   let movedCount = 0;
   const total = tabIds.length;
   const delayMs = total > 15 ? 150 : 100;
+  const config = await chrome.storage.sync.get(['reuseExistingAppWindow']);
+  const reuseExisting = config.reuseExistingAppWindow !== false;
 
   for (let i = 0; i < total; i++) {
     const tabId = tabIds[i];
     try {
       const tab = await chrome.tabs.get(tabId).catch(() => null);
       if (tab) {
-        await chrome.windows.create({
-          tabId: tab.id,
-          type: windowMode,
-          focused: i === total - 1
-        });
-        movedCount++;
+        const success = await moveOrReuseTab(tab, windowMode, reuseExisting, i === total - 1);
+        if (success) movedCount++;
       }
     } catch (err) {
       console.warn(`Could not open tab ${tabId} in app window:`, err);
@@ -196,11 +228,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   if (info.menuItemId === 'open_in_app_current' && tab?.id) {
     try {
-      await chrome.windows.create({
-        tabId: tab.id,
-        type: mode,
-        focused: true
-      });
+      const config = await chrome.storage.sync.get(['reuseExistingAppWindow']);
+      const reuseExisting = config.reuseExistingAppWindow !== false;
+      await moveOrReuseTab(tab, mode, reuseExisting, true);
       // Flash badge confirmation
       await chrome.action.setBadgeText({ text: '✓' });
       await chrome.action.setBadgeBackgroundColor({ color: '#10B981' });
@@ -249,11 +279,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'MOVE_SINGLE_TAB': {
           const tab = await chrome.tabs.get(message.tabId).catch(() => null);
           if (tab) {
-            await chrome.windows.create({
-              tabId: tab.id,
-              type: message.windowMode || 'popup',
-              focused: true
-            });
+            const config = await chrome.storage.sync.get(['reuseExistingAppWindow']);
+            const reuseExisting = config.reuseExistingAppWindow !== false;
+            await moveOrReuseTab(tab, message.windowMode || 'popup', reuseExisting, true);
             sendResponse({ success: true });
             setTimeout(() => updateBadge(), 500);
           } else {
@@ -268,7 +296,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             'customDomains',
             'windowMode',
             'windowScope',
-            'ignorePinnedTabs'
+            'ignorePinnedTabs',
+            'reuseExistingAppWindow'
           ]);
           sendResponse({
             success: true,
@@ -276,7 +305,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             customDomains: data.customDomains || [],
             windowMode: data.windowMode || DEFAULT_CONFIG.windowMode,
             windowScope: data.windowScope || DEFAULT_CONFIG.windowScope,
-            ignorePinnedTabs: data.ignorePinnedTabs !== undefined ? data.ignorePinnedTabs : DEFAULT_CONFIG.ignorePinnedTabs
+            ignorePinnedTabs: data.ignorePinnedTabs !== undefined ? data.ignorePinnedTabs : DEFAULT_CONFIG.ignorePinnedTabs,
+            reuseExistingAppWindow: data.reuseExistingAppWindow !== undefined ? data.reuseExistingAppWindow : DEFAULT_CONFIG.reuseExistingAppWindow
           });
           break;
         }
@@ -288,6 +318,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           if (message.windowMode !== undefined) updates.windowMode = message.windowMode;
           if (message.windowScope !== undefined) updates.windowScope = message.windowScope;
           if (message.ignorePinnedTabs !== undefined) updates.ignorePinnedTabs = message.ignorePinnedTabs;
+          if (message.reuseExistingAppWindow !== undefined) updates.reuseExistingAppWindow = message.reuseExistingAppWindow;
 
           await chrome.storage.sync.set(updates);
           await updateBadge();

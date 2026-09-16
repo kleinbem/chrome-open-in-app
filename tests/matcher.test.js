@@ -5,6 +5,7 @@ import {
   getActiveDomains,
   urlMatchesApp,
   filterEligibleTabs,
+  findExistingAppWindow,
   DEFAULT_PRESETS,
   DEFAULT_CONFIG
 } from '../utils/matcher.js';
@@ -162,7 +163,62 @@ describe('Presets & Config Integrity', () => {
     assert.strictEqual(DEFAULT_CONFIG.windowMode, 'popup');
     assert.strictEqual(DEFAULT_CONFIG.windowScope, 'current');
     assert.strictEqual(DEFAULT_CONFIG.ignorePinnedTabs, true);
+    assert.strictEqual(DEFAULT_CONFIG.reuseExistingAppWindow, true);
     assert.ok(Array.isArray(DEFAULT_CONFIG.presets));
     assert.ok(Array.isArray(DEFAULT_CONFIG.customDomains));
+  });
+});
+
+describe('Smart App Window Reuse', () => {
+  const activeDomains = ['youtube.com', 'mail.google.com', 'chatgpt.com'];
+
+  test('identifies an existing native PWA window for the same domain', () => {
+    const allWindows = [
+      { id: 1, type: 'normal', tabs: [{ id: 101, url: 'https://news.ycombinator.com' }] },
+      { id: 2, type: 'app', tabs: [{ id: 102, url: 'https://youtube.com/feed/subscriptions' }] },
+      { id: 3, type: 'popup', tabs: [{ id: 103, url: 'https://chatgpt.com/' }] }
+    ];
+
+    const result = findExistingAppWindow('https://youtube.com/watch?v=dQw4w9WgXcQ', allWindows, activeDomains);
+    assert.ok(result);
+    assert.strictEqual(result.window.id, 2);
+    assert.strictEqual(result.primaryTab.id, 102);
+  });
+
+  test('identifies an existing popup window for the same domain', () => {
+    const allWindows = [
+      { id: 1, type: 'normal', tabs: [{ id: 101, url: 'https://google.com' }] },
+      { id: 3, type: 'popup', tabs: [{ id: 103, url: 'https://chatgpt.com/c/chat1' }] }
+    ];
+
+    const result = findExistingAppWindow('https://chatgpt.com/c/chat2', allWindows, activeDomains);
+    assert.ok(result);
+    assert.strictEqual(result.window.id, 3);
+    assert.strictEqual(result.primaryTab.id, 103);
+  });
+
+  test('ignores standard browser windows even if domain matches', () => {
+    const allWindows = [
+      { id: 1, type: 'normal', tabs: [{ id: 101, url: 'https://mail.google.com/mail/u/0/' }] }
+    ];
+
+    const result = findExistingAppWindow('https://mail.google.com/mail/u/0/#inbox', allWindows, activeDomains);
+    assert.strictEqual(result, null);
+  });
+
+  test('returns null if no window matches the domain', () => {
+    const allWindows = [
+      { id: 2, type: 'app', tabs: [{ id: 102, url: 'https://youtube.com/' }] }
+    ];
+
+    const result = findExistingAppWindow('https://mail.google.com/mail/u/0/', allWindows, activeDomains);
+    assert.strictEqual(result, null);
+  });
+
+  test('handles invalid or empty inputs gracefully', () => {
+    assert.strictEqual(findExistingAppWindow('', [], activeDomains), null);
+    assert.strictEqual(findExistingAppWindow(null, [], activeDomains), null);
+    assert.strictEqual(findExistingAppWindow('https://youtube.com', null, activeDomains), null);
+    assert.strictEqual(findExistingAppWindow('chrome://settings', [{ type: 'app', tabs: [] }], activeDomains), null);
   });
 });

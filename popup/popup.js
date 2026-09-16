@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const modePopupRadio = document.getElementById('mode-popup');
   const modeNormalRadio = document.getElementById('mode-normal');
   const chkIgnorePinned = document.getElementById('chk-ignore-pinned');
+  const chkReuseExisting = document.getElementById('chk-reuse-existing');
   const presetsList = document.getElementById('presets-list');
   const customDomainsList = document.getElementById('custom-domains-list');
   const formAddCustom = document.getElementById('form-add-custom');
@@ -45,7 +46,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     customDomains: [],
     windowMode: 'popup',
     windowScope: 'current',
-    ignorePinnedTabs: true
+    ignorePinnedTabs: true,
+    reuseExistingAppWindow: true
   };
   let currentTabs = [];
   const selectedTabIds = new Set();
@@ -410,7 +412,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           customDomains: response.customDomains || [],
           windowMode: response.windowMode || 'popup',
           windowScope: response.windowScope || 'current',
-          ignorePinnedTabs: response.ignorePinnedTabs !== false
+          ignorePinnedTabs: response.ignorePinnedTabs !== false,
+          reuseExistingAppWindow: response.reuseExistingAppWindow !== false
         };
 
         if (currentConfig.windowMode === 'normal') {
@@ -422,6 +425,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         chkIgnorePinned.checked = currentConfig.ignorePinnedTabs;
+        if (chkReuseExisting) chkReuseExisting.checked = currentConfig.reuseExistingAppWindow;
 
         renderPresets();
         renderCustomDomains();
@@ -452,6 +456,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentConfig.ignorePinnedTabs = chkIgnorePinned.checked;
     await saveConfig({ ignorePinnedTabs: chkIgnorePinned.checked });
   });
+
+  if (chkReuseExisting) {
+    chkReuseExisting.addEventListener('change', async () => {
+      currentConfig.reuseExistingAppWindow = chkReuseExisting.checked;
+      await saveConfig({ reuseExistingAppWindow: chkReuseExisting.checked });
+    });
+  }
 
   function renderPresets() {
     clearElement(presetsList);

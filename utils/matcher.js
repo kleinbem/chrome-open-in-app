@@ -23,9 +23,10 @@ export const DEFAULT_PRESETS = Object.freeze([
 export const DEFAULT_CONFIG = Object.freeze({
   presets: DEFAULT_PRESETS,
   customDomains: [],
-  windowMode: 'popup',       // 'popup' (frameless) or 'normal' (with toolbars)
-  windowScope: 'current',    // 'current' or 'all'
-  ignorePinnedTabs: true     // whether to protect pinned tabs from batch moves
+  windowMode: 'popup',          // 'popup' (frameless) or 'normal' (with toolbars)
+  windowScope: 'current',       // 'current' or 'all'
+  ignorePinnedTabs: true,       // whether to protect pinned tabs from batch moves
+  reuseExistingAppWindow: true  // switch to existing app/PWA window if already open
 });
 
 // Dangerous keys that must never be processed to prevent Prototype Pollution
@@ -163,4 +164,46 @@ export function filterEligibleTabs(tabs = [], activeDomains = [], options = {}) 
 
     return urlMatchesApp(tab.url, activeDomains);
   });
+}
+
+/**
+ * Find an existing app window or popup window that belongs to the same web application
+ * @param {string} urlStr - The URL of the tab being moved
+ * @param {Array<object>} allWindows - Array of window objects populated with tabs
+ * @param {Array<string>} activeDomains - Array of configured active app domains
+ * @returns {object|null} - { window, primaryTab } or null
+ */
+export function findExistingAppWindow(urlStr, allWindows = [], activeDomains = []) {
+  if (!urlStr || typeof urlStr !== 'string' || !Array.isArray(allWindows)) return null;
+
+  // Identify matching active domain for urlStr
+  let matchedDomain = null;
+  try {
+    const parsed = new URL(urlStr);
+    const hostname = parsed.hostname.toLowerCase();
+    matchedDomain = activeDomains.find((d) => {
+      const clean = d.toLowerCase().trim();
+      return hostname === clean || hostname.endsWith('.' + clean);
+    });
+  } catch {
+    return null;
+  }
+
+  if (!matchedDomain) return null;
+
+  for (const win of allWindows) {
+    // Recognize native PWA windows ('app') or frameless windows ('popup')
+    const isAppWindow = win.type === 'app' || win.type === 'popup';
+    if (isAppWindow && Array.isArray(win.tabs) && win.tabs.length > 0) {
+      const hasMatchingTab = win.tabs.some((t) => urlMatchesApp(t.url, [matchedDomain]));
+      if (hasMatchingTab) {
+        return {
+          window: win,
+          primaryTab: win.tabs[0]
+        };
+      }
+    }
+  }
+
+  return null;
 }
