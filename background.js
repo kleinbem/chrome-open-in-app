@@ -173,7 +173,66 @@ async function moveOrReuseTab(tab, windowMode = 'popup', reuseExisting = true, i
     }
   }
 
-  // 3. Fallback: Create a clean new window for the tab
+  // 3. Genuine App Launcher via Native Messaging (launches real Browser::TYPE_APP with navigation buttons & taskbar icon)
+  if (typeof chrome.runtime?.sendNativeMessage === 'function') {
+    try {
+      const beforeWins = await chrome.windows.getAll({ windowTypes: ['normal', 'popup', 'app'] });
+      const beforeWinIds = new Set(beforeWins.map((w) => w.id));
+
+      const nativeRes = await new Promise((resolve) => {
+        chrome.runtime.sendNativeMessage(
+          'com.kleinbem.open_in_app',
+          { url: tab.url },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              resolve(null);
+            } else {
+              resolve(response);
+            }
+          }
+        );
+      });
+
+      if (nativeRes?.success) {
+        console.log(`[Open in App] Launched genuine native app window via native host for ${tab.url}`, nativeRes);
+
+        // Wait for the new app window to register in Chrome
+        let newAppWin = null;
+        for (let attempt = 0; attempt < 30; attempt++) {
+          await sleep(100);
+          const currentWins = await chrome.windows.getAll({
+            populate: true,
+            windowTypes: ['normal', 'popup', 'app']
+          });
+          newAppWin = currentWins.find(
+            (w) => !beforeWinIds.has(w.id) && (w.type === 'app' || w.type === 'popup')
+          );
+          if (newAppWin) break;
+        }
+
+        if (newAppWin) {
+          console.log(`[Open in App] New app window #${newAppWin.id} opened. Navigating to ${tab.url}`);
+          if (newAppWin.tabs && newAppWin.tabs.length > 0) {
+            const currentTab = newAppWin.tabs[0];
+            if (currentTab.url !== tab.url) {
+              await chrome.tabs.update(currentTab.id, { url: tab.url, active: true });
+            }
+          }
+          await chrome.windows.update(newAppWin.id, { focused: isFocused });
+          await chrome.tabs.remove(tab.id).catch(() => {});
+          return true;
+        } else {
+          // If window was attached/reused by Chrome's internal handler
+          await chrome.tabs.remove(tab.id).catch(() => {});
+          return true;
+        }
+      }
+    } catch (err) {
+      console.warn('[Open in App] Native messaging launch bypassed:', err);
+    }
+  }
+
+  // 4. Fallback: Create a clean new window for the tab
   console.log(`[Open in App] Opening new window (mode: ${windowMode}) for tab ${tab.id}`);
   await chrome.windows.create({
     tabId: tab.id,
@@ -391,3 +450,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   })();
   return true; // Keep channel open for async response
 });
+
+globalThis.moveOrReuseTab = moveOrReuseTab;

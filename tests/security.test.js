@@ -101,7 +101,7 @@ describe('Security: Manifest V3 & Least Privilege Audit', () => {
     assert.ok(!manifest.permissions.includes('scripting'), 'Must not request unnecessary scripting permission');
 
     // Only allow expected minimal permissions
-    const allowedPermissions = new Set(['tabs', 'storage', 'contextMenus', 'management']);
+    const allowedPermissions = new Set(['tabs', 'storage', 'contextMenus', 'management', 'nativeMessaging']);
     for (const p of manifest.permissions) {
       assert.ok(allowedPermissions.has(p), `Unexpected permission requested: ${p}`);
     }
