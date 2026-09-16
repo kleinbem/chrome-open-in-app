@@ -618,6 +618,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (chkReuseExisting) chkReuseExisting.checked = currentConfig.reuseExistingAppWindow;
   }
 
+  async function updateDiagnostics() {
+    const diagWinCount = document.getElementById('diag-windows-count');
+    const diagWinTypes = document.getElementById('diag-window-types');
+    const diagAppsCount = document.getElementById('diag-apps-count');
+    if (!diagWinCount || !diagWinTypes || !diagAppsCount) return;
+
+    try {
+      const windows = await chrome.windows.getAll({
+        populate: true,
+        windowTypes: ['normal', 'popup', 'app']
+      });
+      diagWinCount.textContent = `${windows.length} window${windows.length === 1 ? '' : 's'}`;
+
+      const typeCounts = {};
+      for (const w of windows) {
+        typeCounts[w.type] = (typeCounts[w.type] || 0) + 1;
+      }
+      diagWinTypes.textContent = Object.entries(typeCounts)
+        .map(([type, count]) => `${count} ${type}`)
+        .join(', ') || 'None';
+
+      if (typeof chrome.management !== 'undefined' && chrome.management.getAll) {
+        const apps = await chrome.management.getAll();
+        const appItems = apps.filter((a) => a.type === 'hosted_app' || a.type === 'packaged_app' || Boolean(a.appLaunchUrl));
+        diagAppsCount.textContent = appItems.length > 0
+          ? `${appItems.length} app(s) (${appItems.map((a) => a.name).slice(0, 2).join(', ')})`
+          : '0 apps (Decoupled in Chromium 124+)';
+      } else {
+        diagAppsCount.textContent = 'API not available';
+      }
+    } catch (err) {
+      diagWinCount.textContent = 'Query failed';
+      console.warn('Diagnostics error:', err);
+    }
+  }
+
   const manifestVersion = chrome.runtime.getManifest().version;
   if (versionLabel) {
     versionLabel.textContent = `v${manifestVersion}`;
@@ -625,4 +661,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   console.log(`[Open in App v${manifestVersion}] Popup UI initialized`);
 
   await refreshTabs();
+  await updateDiagnostics();
 });

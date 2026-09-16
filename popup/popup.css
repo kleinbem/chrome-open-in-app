@@ -632,6 +632,34 @@ input:checked + .slider:before {
   color: var(--danger);
 }
 
+/* Diagnostics Panel */
+.diagnostics-card {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 11.5px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diag-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--text-secondary);
+}
+
+.diag-item .diag-val {
+  font-family: monospace;
+  font-size: 10.5px;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
 /* Footer */
 .app-footer {
   padding: 8px 16px;
