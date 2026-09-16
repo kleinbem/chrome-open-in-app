@@ -4,3 +4,5 @@ node_modules/
 *.crx
 *.zip
 .direnv/
+__pycache__/
+*.pyc
