@@ -127,7 +127,8 @@ User settings and preferences (Window Mode, Scope, custom domains) are persisted
 
 | Version | Date | Changes | Status |
 |---|---|---|---|
-| **1.2.0** | 2026-09-16 | Added context menus, dynamic badge counter, pinned tab protection, smart app window reuse (focusing existing PWA instances), modular `utils/matcher.js`, automated unit & security tests, GitHub Actions CI/release automation. | Draft |
+| **1.3.0** | 2026-09-16 | Added smart app window reuse (focusing existing PWA instances), dynamic version display in popup footer, and DevTools startup diagnostics. | Draft |
+| **1.2.0** | 2026-09-16 | Added context menus, dynamic badge counter, pinned tab protection, modular `utils/matcher.js`, automated unit & security tests, GitHub Actions CI/release automation. | Internal |
 | **1.1.0** | 2026-09-16 | Rebranded to Open in App, throttled multi-tab mover, dual window modes (Frameless App vs Dedicated Window), scope selector, tab checklist with progress bar. | Internal |
 | **1.0.0** | 2026-09-16 | Initial Manifest V3 implementation with 1-click batch popout, 16 presets, and Alt+Shift+P shortcut. | Internal |
 

@@ -4,13 +4,14 @@ A high-performance, production-ready Manifest V3 Google Chrome extension that ba
 
 ---
 
-## What's New in v1.2.0
+## What's New in v1.3.0
 
-* 🖱️ **Context Menu Integration**: Right-click on any page background → **"Open this Tab in App Window"**; or right-click the extension icon → **"Open All Matching Tabs in App Windows"**.
-* 📌 **Pinned Tab Protection**: New setting (enabled by default) that prevents your permanently docked/pinned tabs from being detached during batch moves.
-* 🔢 **Dynamic Toolbar Badge**: Extension icon displays a real-time badge count of open app tabs detected in your browser.
-* 🧪 **Automated Test Suite**: Full unit test coverage (`npm test`) using Node's native test runner for domain normalization, tab filtering, and URL matching.
-* 📦 **Modular ES Module Architecture**: Clean separation of core matching logic in `utils/matcher.js`.
+* 🔄 **Smart App Window Reuse**: Automatically detects if an installed PWA or app window for that domain is already open (`win.type === 'app'` or `'popup'`). It brings the existing window to the front, navigates it to the tab's URL, and closes the duplicate browser tab instead of spawning redundant windows.
+* ⚙️ **App Window Reuse Setting**: New toggle in Settings (**"Reuse Existing App Windows"**, enabled by default).
+* 🏷️ **Dynamic Versioning**: Popup footer dynamically displays the version from `manifest.json`.
+* 🩺 **Startup Diagnostics**: Added console diagnostic markers in the service worker and popup UI for instant DevTools verification.
+* 🧪 **Expanded Test Suite**: 30 automated tests passing across 10 test suites (`npm test`).
+* 📜 **Changelog**: Comprehensive release notes maintained in [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
