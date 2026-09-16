@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const formAddCustom = document.getElementById('form-add-custom');
   const inputCustomDomain = document.getElementById('input-custom-domain');
   const statusMessage = document.getElementById('status-message');
+  const versionLabel = document.getElementById('version-label');
 
   // State
   let currentConfig = {
@@ -614,7 +615,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     chkIgnorePinned.checked = currentConfig.ignorePinnedTabs;
+    if (chkReuseExisting) chkReuseExisting.checked = currentConfig.reuseExistingAppWindow;
   }
+
+  const manifestVersion = chrome.runtime.getManifest().version;
+  if (versionLabel) {
+    versionLabel.textContent = `v${manifestVersion}`;
+  }
+  console.log(`[Open in App v${manifestVersion}] Popup UI initialized`);
 
   await refreshTabs();
 });

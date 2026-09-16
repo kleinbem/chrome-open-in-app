@@ -7,6 +7,9 @@ import {
   DEFAULT_CONFIG
 } from './utils/matcher.js';
 
+const manifestVersion = chrome.runtime.getManifest().version;
+console.log(`[Open in App v${manifestVersion}] Background Service Worker active`);
+
 // Setup default configuration and context menus on install
 chrome.runtime.onInstalled.addListener(async () => {
   const existing = await chrome.storage.sync.get([
