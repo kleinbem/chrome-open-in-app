@@ -6,3 +6,4 @@ node_modules/
 .direnv/
 __pycache__/
 *.pyc
+host/chrome-open-in-app-host*

@@ -5,14 +5,25 @@ set -euo pipefail
 # Installs the helper script and manifests for Chromium-based browsers.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 TARGET_BIN="${HOME}/.local/bin/chrome-open-in-app-host"
 EXTENSION_ID="${1:-ngfknlddgkbipaimbaihckmaodkmndoa}"
 
-echo "Installing Open in App Native Messaging Host..."
+echo "Installing Open in App Native Messaging Host (Go binary)..."
 
-# 1. Install executable
+# 1. Build and install executable
 mkdir -p "${HOME}/.local/bin"
-cp "${SCRIPT_DIR}/chrome-open-in-app-host" "${TARGET_BIN}"
+
+if command -v go >/dev/null 2>&1 && [ -f "${REPO_ROOT}/host/main.go" ]; then
+  echo "Compiling native host from Go source..."
+  (cd "${REPO_ROOT}/host" && go build -ldflags="-s -w" -o "${TARGET_BIN}" main.go)
+elif [ -f "${REPO_ROOT}/host/chrome-open-in-app-host" ]; then
+  cp "${REPO_ROOT}/host/chrome-open-in-app-host" "${TARGET_BIN}"
+else
+  echo "Error: Neither Go compiler nor prebuilt binary found." >&2
+  exit 1
+fi
+
 chmod +x "${TARGET_BIN}"
 echo "✓ Installed host executable to ${TARGET_BIN}"
 
