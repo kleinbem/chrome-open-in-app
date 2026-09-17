@@ -206,55 +206,7 @@ async function moveOrReuseTab(tab, windowMode = 'popup', reuseExisting = true, i
     }
   }
 
-  // 1C. In App / Popup Mode ('popup' / 'app'):
-  // If an app or popup window already exists for this app domain, add this tab directly to it!
-  // This preserves the app window's PWA identity, taskbar icon, and window frame controls.
-  if (existing && !existing.isExactMatch && existing.window.id !== tab.windowId) {
-    console.log(`[Open in App] Adding tab ${tab.id} to existing ${existing.window.type} window #${existing.window.id} for ${tab.url}`);
-    let tabAdded = false;
-
-    // First attempt: Move the live tab into the existing app window
-    try {
-      await chrome.tabs.move(tab.id, { windowId: existing.window.id, index: -1 });
-      tabAdded = true;
-    } catch (moveErr) {
-      console.log(`[Open in App] chrome.tabs.move to window #${existing.window.id} not supported, falling back to chrome.tabs.create:`, moveErr);
-      // Fallback: Create tab in existing app window and remove original tab
-      try {
-        await chrome.tabs.create({
-          windowId: existing.window.id,
-          url: tab.url,
-          active: isFocused
-        });
-        await chrome.tabs.remove(tab.id).catch(() => {});
-        tabAdded = true;
-      } catch (createErr) {
-        console.warn(`[Open in App] Failed to create tab in existing app window #${existing.window.id}:`, createErr);
-      }
-    }
-
-    if (tabAdded) {
-      if (isFocused) {
-        await chrome.windows.update(existing.window.id, { focused: true });
-        await chrome.tabs.update(tab.id, { active: true }).catch(() => {});
-      }
-      return true;
-    }
-
-    // Standalone PWA fallback:
-    // The existing app window is standalone and cannot hold multiple tabs (e.g. Google Gemini).
-    // DO NOT invoke the native host (--app-id), as that would hijack the existing window
-    // and trigger Google rate limiting. Instead, create a clean separate window for this tab directly.
-    console.log(`[Open in App] App window #${existing.window.id} cannot accept tabs. Creating separate window for tab ${tab.id}`);
-    await chrome.windows.create({
-      tabId: tab.id,
-      type: windowMode,
-      focused: isFocused
-    });
-    return true;
-  }
-
-  // 1D. Tab is already in the target app window:
+  // 1C. Tab is already in the target app window:
   if (existing && existing.window.id === tab.windowId) {
     if (isFocused) {
       await chrome.windows.update(existing.window.id, { focused: true });
@@ -302,11 +254,12 @@ async function moveOrReuseTab(tab, windowMode = 'popup', reuseExisting = true, i
         }
 
         if (newAppWin) {
-          console.log(`[Open in App] New app window #${newAppWin.id} opened. Navigating to ${tab.url}`);
+          console.log(`[Open in App] New app window #${newAppWin.id} opened for ${tab.url}`);
           if (newAppWin.tabs && newAppWin.tabs.length > 0) {
             const currentTab = newAppWin.tabs[0];
-            if (currentTab.url !== tab.url) {
-              await chrome.tabs.update(currentTab.id, { url: tab.url, active: true });
+            const isAlreadyNavigating = currentTab.url === tab.url || currentTab.pendingUrl === tab.url;
+            if (!isAlreadyNavigating && currentTab.url && currentTab.url !== 'about:blank') {
+              await chrome.tabs.update(currentTab.id, { url: tab.url, active: true }).catch(() => {});
             }
           }
           await chrome.windows.update(newAppWin.id, { focused: isFocused });
@@ -341,7 +294,7 @@ let badgeUpdateTimer = null;
 async function moveTabsThrottled(tabIds, windowMode = 'popup', onProgress = null) {
   let movedCount = 0;
   const total = tabIds.length;
-  const delayMs = total > 20 ? 50 : 80;
+  const delayMs = total > 20 ? 100 : 200;
   const config = await chrome.storage.sync.get(['reuseExistingAppWindow']);
   const reuseExisting = config.reuseExistingAppWindow !== false;
 
