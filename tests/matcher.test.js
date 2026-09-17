@@ -205,6 +205,17 @@ describe('Smart App Window Reuse', () => {
     assert.strictEqual(result.isExactMatch, true);
   });
 
+  test('distinguishes different hash routes in SPAs like Gmail as non-exact matches', () => {
+    const allWindows = [
+      { id: 2, type: 'app', tabs: [{ id: 102, url: 'https://mail.google.com/mail/u/0/#inbox' }] }
+    ];
+
+    const result = findExistingAppWindow('https://mail.google.com/mail/u/0/#inbox/thread123', allWindows, activeDomains);
+    assert.ok(result);
+    assert.strictEqual(result.window.id, 2);
+    assert.strictEqual(result.isExactMatch, false);
+  });
+
   test('identifies an existing popup window for the same domain', () => {
     const allWindows = [
       { id: 1, type: 'normal', tabs: [{ id: 101, url: 'https://google.com' }] },

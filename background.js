@@ -305,7 +305,7 @@ async function moveTabsThrottled(tabIds, windowMode = 'popup', onProgress = null
       try {
         const tab = await chrome.tabs.get(tabId).catch(() => null);
         if (tab) {
-          const success = await moveOrReuseTab(tab, windowMode, reuseExisting, i === total - 1);
+          const success = await moveOrReuseTab(tab, windowMode, reuseExisting, true);
           if (success) movedCount++;
         }
       } catch (err) {

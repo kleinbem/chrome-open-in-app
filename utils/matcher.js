@@ -193,7 +193,8 @@ export function normalizeUrlForMatching(urlStr) {
   if (!urlStr || typeof urlStr !== 'string') return '';
   try {
     const u = new URL(urlStr);
-    return (u.origin + u.pathname.replace(/\/+$/, '') + u.search).toLowerCase();
+    const hash = u.hash ? u.hash.replace(/\/+$/, '') : '';
+    return (u.origin + u.pathname.replace(/\/+$/, '') + u.search + hash).toLowerCase();
   } catch {
     return (urlStr || '').toLowerCase().trim();
   }
