@@ -240,6 +240,18 @@ async function moveOrReuseTab(tab, windowMode = 'popup', reuseExisting = true, i
       }
       return true;
     }
+
+    // Standalone PWA fallback:
+    // The existing app window is standalone and cannot hold multiple tabs (e.g. Google Gemini).
+    // DO NOT invoke the native host (--app-id), as that would hijack the existing window
+    // and trigger Google rate limiting. Instead, create a clean separate window for this tab directly.
+    console.log(`[Open in App] App window #${existing.window.id} cannot accept tabs. Creating separate window for tab ${tab.id}`);
+    await chrome.windows.create({
+      tabId: tab.id,
+      type: windowMode,
+      focused: isFocused
+    });
+    return true;
   }
 
   // 1D. Tab is already in the target app window:

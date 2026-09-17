@@ -134,10 +134,28 @@ export function urlMatchesApp(urlStr, activeDomains = []) {
     }
     const hostname = parsed.hostname.toLowerCase();
 
-    return activeDomains.some((d) => {
+    const directMatch = activeDomains.some((d) => {
       const clean = d.toLowerCase().trim();
       return hostname === clean || hostname.endsWith('.' + clean);
     });
+    if (directMatch) return true;
+
+    // Handle Google Captcha/Sorry redirect pages that are waiting to return to an active app
+    if ((hostname === 'google.com' || hostname.endsWith('.google.com')) && parsed.pathname.startsWith('/sorry/')) {
+      const continueParam = parsed.searchParams.get('continue');
+      if (continueParam) {
+        try {
+          const continueUrl = new URL(continueParam);
+          const continueHost = continueUrl.hostname.toLowerCase();
+          return activeDomains.some((d) => {
+            const clean = d.toLowerCase().trim();
+            return continueHost === clean || continueHost.endsWith('.' + clean);
+          });
+        } catch {}
+      }
+    }
+
+    return false;
   } catch {
     return false;
   }

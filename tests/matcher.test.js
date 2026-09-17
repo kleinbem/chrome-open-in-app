@@ -90,6 +90,12 @@ describe('URL Matching', () => {
     assert.strictEqual(urlMatchesApp('https://google.com/search', activeDomains), false);
   });
 
+  test('matches Google Captcha / Sorry redirect pages destined for active app', () => {
+    const sorryUrl = 'https://www.google.com/sorry/index?continue=https://gemini.google.com/app/12345&q=EgRUywm';
+    assert.strictEqual(urlMatchesApp(sorryUrl, ['gemini.google.com']), true);
+    assert.strictEqual(urlMatchesApp(sorryUrl, ['youtube.com']), false);
+  });
+
   test('rejects non-HTTP schemes and internal browser tabs', () => {
     assert.strictEqual(urlMatchesApp('chrome://settings', activeDomains), false);
     assert.strictEqual(urlMatchesApp('chrome-extension://abcdef/popup.html', activeDomains), false);
