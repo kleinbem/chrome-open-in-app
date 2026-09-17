@@ -5,6 +5,7 @@ import {
   isSafeDomain,
   groupTabsByApp,
   getActiveDomains,
+  SUGGESTED_APP_TEMPLATES,
   DEFAULT_CONFIG
 } from '../utils/matcher.js';
 
@@ -53,7 +54,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const modeNormalRadio = document.getElementById('mode-normal');
   const chkIgnorePinned = document.getElementById('chk-ignore-pinned');
   const chkReuseExisting = document.getElementById('chk-reuse-existing');
+  const installedPwasList = document.getElementById('installed-pwas-list');
+  const btnRescanPwas = document.getElementById('btn-rescan-pwas');
+  const activePresetsSection = document.getElementById('active-presets-section');
   const presetsList = document.getElementById('presets-list');
+  const catalogPresetsList = document.getElementById('catalog-presets-list');
   const customDomainsList = document.getElementById('custom-domains-list');
   const formAddCustom = document.getElementById('form-add-custom');
   const inputCustomDomain = document.getElementById('input-custom-domain');
@@ -63,6 +68,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // State
   let currentConfig = {
     presets: DEFAULT_CONFIG.presets,
+    disabledInstalledAppIds: DEFAULT_CONFIG.disabledInstalledAppIds,
     customDomains: [],
     windowMode: DEFAULT_CONFIG.windowMode,
     windowScope: DEFAULT_CONFIG.windowScope,
@@ -71,6 +77,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     toolbarAction: DEFAULT_CONFIG.toolbarAction,
     defaultGrouping: DEFAULT_CONFIG.defaultGrouping
   };
+
+  let installedApps = [];
 
   let currentGrouping = 'grouped';
   let searchQuery = '';
@@ -740,6 +748,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (response && response.success) {
         currentConfig = {
           presets: response.presets || DEFAULT_CONFIG.presets,
+          disabledInstalledAppIds: response.disabledInstalledAppIds || [],
           customDomains: response.customDomains || [],
           windowMode: response.windowMode || DEFAULT_CONFIG.windowMode,
           windowScope: response.windowScope || DEFAULT_CONFIG.windowScope,
@@ -748,6 +757,14 @@ document.addEventListener('DOMContentLoaded', async () => {
           toolbarAction: response.toolbarAction || DEFAULT_CONFIG.toolbarAction,
           defaultGrouping: response.defaultGrouping || DEFAULT_CONFIG.defaultGrouping
         };
+
+        // Fetch installed apps from system
+        try {
+          const appRes = await chrome.runtime.sendMessage({ action: 'GET_INSTALLED_APPS' });
+          if (appRes?.success && Array.isArray(appRes.apps)) {
+            installedApps = appRes.apps;
+          }
+        } catch {}
 
         if (toolbarModePopup && toolbarModeTab) {
           if (currentConfig.toolbarAction === 'tab') {
@@ -776,7 +793,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         chkIgnorePinned.checked = currentConfig.ignorePinnedTabs;
         if (chkReuseExisting) chkReuseExisting.checked = currentConfig.reuseExistingAppWindow;
 
-        renderPresets();
+        renderInstalledPWAs();
+        renderActivePresets();
+        renderCatalogPresets();
         renderCustomDomains();
       }
     } catch (err) {
@@ -857,9 +876,83 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  function renderPresets() {
+  function renderInstalledPWAs() {
+    if (!installedPwasList) return;
+    clearElement(installedPwasList);
+
+    if (!Array.isArray(installedApps) || installedApps.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.fontSize = '11px';
+      empty.style.color = 'var(--text-muted)';
+      empty.style.gridColumn = '1 / -1';
+      empty.style.padding = '6px 0';
+      empty.textContent = 'No desktop PWAs detected on this machine. You can install any web app in Chrome or pick from the popular catalog below.';
+      installedPwasList.appendChild(empty);
+      return;
+    }
+
+    const disabledSet = new Set(currentConfig.disabledInstalledAppIds || []);
+
+    for (const app of installedApps) {
+      const item = document.createElement('div');
+      item.className = 'preset-item';
+
+      const label = document.createElement('div');
+      label.className = 'preset-label';
+
+      const name = document.createElement('span');
+      name.className = 'preset-name';
+      name.textContent = app.name || 'Unnamed App';
+
+      const domain = document.createElement('span');
+      domain.className = 'preset-domain';
+      domain.textContent = app.domains?.[0] || 'Desktop App';
+
+      label.appendChild(name);
+      label.appendChild(domain);
+
+      const toggleWrap = document.createElement('label');
+      toggleWrap.className = 'switch';
+
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = !disabledSet.has(app.id);
+
+      const slider = document.createElement('span');
+      slider.className = 'slider';
+
+      input.addEventListener('change', async () => {
+        const currentDisabled = new Set(currentConfig.disabledInstalledAppIds || []);
+        if (input.checked) {
+          currentDisabled.delete(app.id);
+        } else {
+          currentDisabled.add(app.id);
+        }
+        currentConfig.disabledInstalledAppIds = Array.from(currentDisabled);
+        await saveConfig({ disabledInstalledAppIds: currentConfig.disabledInstalledAppIds });
+        renderCatalogPresets();
+      });
+
+      toggleWrap.appendChild(input);
+      toggleWrap.appendChild(slider);
+
+      item.appendChild(label);
+      item.appendChild(toggleWrap);
+      installedPwasList.appendChild(item);
+    }
+  }
+
+  function renderActivePresets() {
+    if (!presetsList) return;
     clearElement(presetsList);
-    for (const preset of currentConfig.presets) {
+
+    const activeList = currentConfig.presets || [];
+    if (activePresetsSection) {
+      activePresetsSection.style.display = activeList.length > 0 ? 'block' : 'none';
+    }
+
+    for (let index = 0; index < activeList.length; index++) {
+      const preset = activeList[index];
       const item = document.createElement('div');
       item.className = 'preset-item';
 
@@ -877,28 +970,111 @@ document.addEventListener('DOMContentLoaded', async () => {
       label.appendChild(name);
       label.appendChild(domain);
 
-      const toggleWrap = document.createElement('label');
-      toggleWrap.className = 'switch';
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn-delete-custom';
+      delBtn.title = 'Remove preset';
+      delBtn.appendChild(createTrashSvgIcon());
 
-      const input = document.createElement('input');
-      input.type = 'checkbox';
-      input.checked = preset.enabled !== false;
-
-      const slider = document.createElement('span');
-      slider.className = 'slider';
-
-      input.addEventListener('change', async () => {
-        preset.enabled = input.checked;
+      delBtn.addEventListener('click', async () => {
+        activeList.splice(index, 1);
+        currentConfig.presets = activeList;
         await saveConfig({ presets: currentConfig.presets });
+        renderActivePresets();
+        renderCatalogPresets();
       });
 
-      toggleWrap.appendChild(input);
-      toggleWrap.appendChild(slider);
-
       item.appendChild(label);
-      item.appendChild(toggleWrap);
+      item.appendChild(delBtn);
       presetsList.appendChild(item);
     }
+  }
+
+  function renderCatalogPresets() {
+    if (!catalogPresetsList) return;
+    clearElement(catalogPresetsList);
+
+    const activeDomains = new Set((currentConfig.presets || []).map(p => p.domain?.toLowerCase()));
+    const installedDomains = new Set();
+    if (Array.isArray(installedApps)) {
+      for (const app of installedApps) {
+        if (Array.isArray(app.domains)) {
+          for (const d of app.domains) installedDomains.add(d.toLowerCase());
+        }
+      }
+    }
+
+    for (const template of SUGGESTED_APP_TEMPLATES) {
+      const card = document.createElement('div');
+      card.className = 'catalog-card';
+
+      const info = document.createElement('div');
+      info.className = 'catalog-info';
+
+      const name = document.createElement('span');
+      name.className = 'catalog-name';
+      name.textContent = template.name;
+
+      const domain = document.createElement('span');
+      domain.className = 'catalog-domain';
+      domain.textContent = template.domain;
+
+      info.appendChild(name);
+      info.appendChild(domain);
+
+      const isInstalled = installedDomains.has(template.domain.toLowerCase());
+      const isPreset = activeDomains.has(template.domain.toLowerCase());
+
+      const btn = document.createElement('button');
+      if (isInstalled) {
+        btn.className = 'btn-catalog-added';
+        btn.textContent = 'Installed';
+        btn.title = 'Already installed on this computer as desktop PWA';
+      } else if (isPreset) {
+        btn.className = 'btn-catalog-added';
+        btn.textContent = 'Active';
+        btn.title = 'Already active in presets';
+      } else {
+        btn.className = 'btn-catalog-add';
+        btn.textContent = '+ Add';
+        btn.title = `Add ${template.name} (${template.domain})`;
+        btn.addEventListener('click', async () => {
+          if (!Array.isArray(currentConfig.presets)) currentConfig.presets = [];
+          currentConfig.presets.push({
+            id: template.id,
+            name: template.name,
+            domain: template.domain,
+            enabled: true
+          });
+          await saveConfig({ presets: currentConfig.presets });
+          renderActivePresets();
+          renderCatalogPresets();
+        });
+      }
+
+      card.appendChild(info);
+      card.appendChild(btn);
+      catalogPresetsList.appendChild(card);
+    }
+  }
+
+  if (btnRescanPwas) {
+    btnRescanPwas.addEventListener('click', async () => {
+      btnRescanPwas.disabled = true;
+      btnRescanPwas.textContent = 'Scanning...';
+      try {
+        const res = await chrome.runtime.sendMessage({ action: 'GET_INSTALLED_APPS', forceRefresh: true });
+        if (res?.success && Array.isArray(res.apps)) {
+          installedApps = res.apps;
+          renderInstalledPWAs();
+          renderCatalogPresets();
+        }
+      } catch (err) {
+        console.warn('Rescan failed:', err);
+      } finally {
+        btnRescanPwas.disabled = false;
+        btnRescanPwas.textContent = 'Scan System';
+      }
+    });
   }
 
   function renderCustomDomains() {

@@ -1,35 +1,42 @@
 // Utility functions for domain matching, normalization, and tab filtering
 // Hardened against Prototype Pollution and Injection Attacks (ES2024)
 
-export const DEFAULT_PRESETS = Object.freeze([
-  { id: 'youtube', name: 'YouTube', domain: 'youtube.com', enabled: true },
-  { id: 'youtube_music', name: 'YouTube Music', domain: 'music.youtube.com', enabled: true },
-  { id: 'gmail', name: 'Gmail', domain: 'mail.google.com', enabled: true },
-  { id: 'calendar', name: 'Google Calendar', domain: 'calendar.google.com', enabled: true },
-  { id: 'chat', name: 'Google Chat', domain: 'chat.google.com', enabled: true },
-  { id: 'meet', name: 'Google Meet', domain: 'meet.google.com', enabled: true },
-  { id: 'keep', name: 'Google Keep', domain: 'keep.google.com', enabled: true },
-  { id: 'drive', name: 'Google Drive', domain: 'drive.google.com', enabled: true },
-  { id: 'maps', name: 'Google Maps', domain: 'maps.google.com', enabled: true },
-  { id: 'gemini', name: 'Google Gemini', domain: 'gemini.google.com', enabled: true },
-  { id: 'ai_studio', name: 'Google AI Studio', domain: 'aistudio.google.com', enabled: true },
-  { id: 'messages', name: 'Google Messages', domain: 'messages.google.com', enabled: true },
-  { id: 'chatgpt', name: 'ChatGPT', domain: 'chatgpt.com', enabled: true },
-  { id: 'claude', name: 'Claude', domain: 'claude.ai', enabled: true },
-  { id: 'whatsapp', name: 'WhatsApp Web', domain: 'web.whatsapp.com', enabled: true },
-  { id: 'instagram', name: 'Instagram', domain: 'instagram.com', enabled: true },
-  { id: 'deepseek', name: 'DeepSeek', domain: 'chat.deepseek.com', enabled: true },
-  { id: 'cloud_shell', name: 'Cloud Shell', domain: 'shell.cloud.google.com', enabled: true },
-  { id: 'slack', name: 'Slack', domain: 'app.slack.com', enabled: true },
-  { id: 'discord', name: 'Discord', domain: 'discord.com', enabled: true },
-  { id: 'spotify', name: 'Spotify', domain: 'open.spotify.com', enabled: true },
-  { id: 'notion', name: 'Notion', domain: 'notion.so', enabled: true },
-  { id: 'github', name: 'GitHub', domain: 'github.com', enabled: true },
-  { id: 'figma', name: 'Figma', domain: 'figma.com', enabled: true }
+// Curated catalog of popular web app templates (optional suggestions for users to pick from)
+export const SUGGESTED_APP_TEMPLATES = Object.freeze([
+  { id: 'youtube', name: 'YouTube', domain: 'youtube.com', category: 'Media' },
+  { id: 'youtube_music', name: 'YouTube Music', domain: 'music.youtube.com', category: 'Media' },
+  { id: 'spotify', name: 'Spotify', domain: 'open.spotify.com', category: 'Media' },
+  { id: 'gmail', name: 'Gmail', domain: 'mail.google.com', category: 'Google' },
+  { id: 'calendar', name: 'Google Calendar', domain: 'calendar.google.com', category: 'Google' },
+  { id: 'chat', name: 'Google Chat', domain: 'chat.google.com', category: 'Google' },
+  { id: 'meet', name: 'Google Meet', domain: 'meet.google.com', category: 'Google' },
+  { id: 'keep', name: 'Google Keep', domain: 'keep.google.com', category: 'Google' },
+  { id: 'drive', name: 'Google Drive', domain: 'drive.google.com', category: 'Google' },
+  { id: 'maps', name: 'Google Maps', domain: 'maps.google.com', category: 'Google' },
+  { id: 'messages', name: 'Google Messages', domain: 'messages.google.com', category: 'Google' },
+  { id: 'gemini', name: 'Google Gemini', domain: 'gemini.google.com', category: 'AI' },
+  { id: 'ai_studio', name: 'Google AI Studio', domain: 'aistudio.google.com', category: 'AI' },
+  { id: 'chatgpt', name: 'ChatGPT', domain: 'chatgpt.com', category: 'AI' },
+  { id: 'claude', name: 'Claude', domain: 'claude.ai', category: 'AI' },
+  { id: 'deepseek', name: 'DeepSeek', domain: 'chat.deepseek.com', category: 'AI' },
+  { id: 'cloud_shell', name: 'Cloud Shell', domain: 'shell.cloud.google.com', category: 'Developer' },
+  { id: 'github', name: 'GitHub', domain: 'github.com', category: 'Developer' },
+  { id: 'slack', name: 'Slack', domain: 'app.slack.com', category: 'Productivity' },
+  { id: 'notion', name: 'Notion', domain: 'notion.so', category: 'Productivity' },
+  { id: 'figma', name: 'Figma', domain: 'figma.com', category: 'Productivity' },
+  { id: 'discord', name: 'Discord', domain: 'discord.com', category: 'Social' },
+  { id: 'whatsapp', name: 'WhatsApp Web', domain: 'web.whatsapp.com', category: 'Social' },
+  { id: 'instagram', name: 'Instagram', domain: 'instagram.com', category: 'Social' }
 ]);
 
+// Provided for backward compatibility
+export const DEFAULT_PRESETS = Object.freeze(
+  SUGGESTED_APP_TEMPLATES.map((t) => ({ ...t, enabled: true }))
+);
+
 export const DEFAULT_CONFIG = Object.freeze({
-  presets: DEFAULT_PRESETS,
+  presets: [],                  // empty by default; dynamically populated from discovered installed PWAs or user catalog choices
+  disabledInstalledAppIds: [],  // IDs of auto-detected PWAs the user chose to disable
   customDomains: [],
   windowMode: 'popup',          // 'popup' (frameless) or 'normal' (with toolbars)
   windowScope: 'current',       // 'current' or 'all'
@@ -96,9 +103,11 @@ export function normalizeDomain(input) {
 /**
  * Extract an array of active, clean domain strings from presets, custom domains, and discovered PWAs
  */
-export function getActiveDomains(presets = [], customDomains = [], installedApps = []) {
+export function getActiveDomains(presets = [], customDomains = [], installedApps = [], disabledAppIds = []) {
   const active = [];
+  const disabledSet = new Set(Array.isArray(disabledAppIds) ? disabledAppIds : []);
 
+  // 1. User-enabled presets (e.g. from catalog)
   if (Array.isArray(presets)) {
     for (const p of presets) {
       if (p && p.enabled !== false && p.domain && isSafeDomain(p.domain)) {
@@ -110,6 +119,7 @@ export function getActiveDomains(presets = [], customDomains = [], installedApps
     }
   }
 
+  // 2. User-defined custom domains
   if (Array.isArray(customDomains)) {
     for (const c of customDomains) {
       const domainStr = typeof c === 'string' ? c : c?.domain;
@@ -123,9 +133,10 @@ export function getActiveDomains(presets = [], customDomains = [], installedApps
     }
   }
 
+  // 3. Dynamically discovered OS / browser PWAs (unless disabled by user)
   if (Array.isArray(installedApps)) {
     for (const app of installedApps) {
-      if (app && Array.isArray(app.domains)) {
+      if (app && !disabledSet.has(app.id) && Array.isArray(app.domains)) {
         for (const d of app.domains) {
           if (isSafeDomain(d)) {
             const normalized = normalizeDomain(d);
@@ -400,9 +411,10 @@ export function findMatchingInstalledApp(urlStr, installedApps = []) {
  * @param {Array<object>} tabs - Array of tab objects
  * @param {Array<string>} activeDomains - List of active domain strings
  * @param {Array<object>} presets - List of configured presets
+ * @param {Array<object>} installedApps - List of discovered installed PWAs
  * @returns {Array<object>} - Array of group objects: { key, name, domain, icon, tabs: [] }
  */
-export function groupTabsByApp(tabs = [], activeDomains = [], presets = DEFAULT_PRESETS) {
+export function groupTabsByApp(tabs = [], activeDomains = [], presets = [], installedApps = []) {
   if (!Array.isArray(tabs) || tabs.length === 0) return [];
 
   const groupsMap = new Map();
@@ -417,23 +429,35 @@ export function groupTabsByApp(tabs = [], activeDomains = [], presets = DEFAULT_
       continue;
     }
 
-    // Find if host matches any preset
-    const preset = Array.isArray(presets)
-      ? presets.find((p) => {
-          if (!p || !p.domain) return false;
-          const cleanPresetDomain = p.domain.toLowerCase().trim();
-          return host === cleanPresetDomain || host.endsWith('.' + cleanPresetDomain);
-        })
-      : null;
+    // 1. Check if host matches any dynamically discovered installed PWA
+    let matchedInstalledApp = null;
+    if (Array.isArray(installedApps)) {
+      matchedInstalledApp = installedApps.find((app) => {
+        if (!app || !Array.isArray(app.domains)) return false;
+        return app.domains.some((d) => host === d || host.endsWith('.' + d));
+      });
+    }
+
+    // 2. Check if host matches any preset (or catalog template)
+    const presetList = Array.isArray(presets) && presets.length > 0 ? presets : SUGGESTED_APP_TEMPLATES;
+    const matchedPreset = presetList.find((p) => {
+      if (!p || !p.domain) return false;
+      const cleanPresetDomain = p.domain.toLowerCase().trim();
+      return host === cleanPresetDomain || host.endsWith('.' + cleanPresetDomain);
+    });
 
     let groupKey = '';
     let groupName = '';
     let groupDomain = '';
 
-    if (preset) {
-      groupKey = preset.id || preset.domain;
-      groupName = preset.name || preset.domain;
-      groupDomain = preset.domain;
+    if (matchedInstalledApp) {
+      groupKey = matchedInstalledApp.id || matchedInstalledApp.name;
+      groupName = matchedInstalledApp.name || host;
+      groupDomain = matchedInstalledApp.domains?.[0] || host;
+    } else if (matchedPreset) {
+      groupKey = matchedPreset.id || matchedPreset.domain;
+      groupName = matchedPreset.name || matchedPreset.domain;
+      groupDomain = matchedPreset.domain;
     } else {
       const matchedDomain = Array.isArray(activeDomains)
         ? activeDomains.find((d) => host === d || host.endsWith('.' + d))

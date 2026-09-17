@@ -15,6 +15,7 @@ console.log(`[Open in App v${manifestVersion}] Background Service Worker active`
 chrome.runtime.onInstalled.addListener(async () => {
   const existing = await chrome.storage.sync.get([
     'presets',
+    'disabledInstalledAppIds',
     'customDomains',
     'windowMode',
     'windowScope',
@@ -26,6 +27,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 
   const updates = {};
   if (!existing.presets) updates.presets = DEFAULT_CONFIG.presets;
+  if (!existing.disabledInstalledAppIds) updates.disabledInstalledAppIds = DEFAULT_CONFIG.disabledInstalledAppIds;
   if (!existing.customDomains) updates.customDomains = DEFAULT_CONFIG.customDomains;
   if (!existing.windowMode) updates.windowMode = DEFAULT_CONFIG.windowMode;
   if (!existing.windowScope) updates.windowScope = DEFAULT_CONFIG.windowScope;
@@ -161,10 +163,15 @@ async function getInstalledPWAs(forceRefresh = false) {
  */
 async function loadActiveDomains() {
   const [data, installedApps] = await Promise.all([
-    chrome.storage.sync.get(['presets', 'customDomains']),
+    chrome.storage.sync.get(['presets', 'customDomains', 'disabledInstalledAppIds']),
     getInstalledPWAs()
   ]);
-  return getActiveDomains(data.presets, data.customDomains, installedApps);
+  return getActiveDomains(
+    data.presets || [],
+    data.customDomains || [],
+    installedApps || [],
+    data.disabledInstalledAppIds || []
+  );
 }
 
 /**
@@ -550,6 +557,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'GET_CONFIG': {
           const data = await chrome.storage.sync.get([
             'presets',
+            'disabledInstalledAppIds',
             'customDomains',
             'windowMode',
             'windowScope',
@@ -561,6 +569,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({
             success: true,
             presets: data.presets || DEFAULT_CONFIG.presets,
+            disabledInstalledAppIds: data.disabledInstalledAppIds || [],
             customDomains: data.customDomains || [],
             windowMode: data.windowMode || DEFAULT_CONFIG.windowMode,
             windowScope: data.windowScope || DEFAULT_CONFIG.windowScope,
@@ -575,6 +584,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'SAVE_CONFIG': {
           const updates = {};
           if (message.presets !== undefined) updates.presets = message.presets;
+          if (message.disabledInstalledAppIds !== undefined) updates.disabledInstalledAppIds = message.disabledInstalledAppIds;
           if (message.customDomains !== undefined) updates.customDomains = message.customDomains;
           if (message.windowMode !== undefined) updates.windowMode = message.windowMode;
           if (message.windowScope !== undefined) updates.windowScope = message.windowScope;

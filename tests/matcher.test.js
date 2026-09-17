@@ -8,6 +8,7 @@ import {
   findExistingAppWindow,
   findMatchingInstalledApp,
   groupTabsByApp,
+  SUGGESTED_APP_TEMPLATES,
   DEFAULT_PRESETS,
   DEFAULT_CONFIG
 } from '../utils/matcher.js';
@@ -167,12 +168,22 @@ describe('Presets & Config Integrity', () => {
     }
   });
 
-  test('default configuration has valid properties', () => {
+  test('suggested app templates catalog has valid categories', () => {
+    assert.ok(Array.isArray(SUGGESTED_APP_TEMPLATES));
+    assert.ok(SUGGESTED_APP_TEMPLATES.length >= 10);
+    for (const t of SUGGESTED_APP_TEMPLATES) {
+      assert.ok(t.category && typeof t.category === 'string');
+      assert.ok(t.name && t.domain);
+    }
+  });
+
+  test('default configuration has valid properties and clean initial presets', () => {
     assert.strictEqual(DEFAULT_CONFIG.windowMode, 'popup');
     assert.strictEqual(DEFAULT_CONFIG.windowScope, 'current');
     assert.strictEqual(DEFAULT_CONFIG.ignorePinnedTabs, true);
     assert.strictEqual(DEFAULT_CONFIG.reuseExistingAppWindow, true);
     assert.ok(Array.isArray(DEFAULT_CONFIG.presets));
+    assert.ok(Array.isArray(DEFAULT_CONFIG.disabledInstalledAppIds));
     assert.ok(Array.isArray(DEFAULT_CONFIG.customDomains));
   });
 });
@@ -379,12 +390,14 @@ describe('Installed PWA Detection & Launch Matching', () => {
     assert.strictEqual(chatgptMatch.id, 'cadlkienfkclaiaibeoongdcgmdikeeg');
   });
 
-  test('getActiveDomains dynamically incorporates domains from installed PWAs', () => {
+  test('getActiveDomains dynamically incorporates domains from installed PWAs and respects disabledAppIds', () => {
     const desktopPwas = [
-      { id: 'custom_pwa', name: 'Custom PWA', domains: ['mycompany.internal.app'] }
+      { id: 'custom_pwa', name: 'Custom PWA', domains: ['mycompany.internal.app'] },
+      { id: 'disabled_pwa', name: 'Disabled PWA', domains: ['disabled.internal.app'] }
     ];
-    const active = getActiveDomains([], [], desktopPwas);
+    const active = getActiveDomains([], [], desktopPwas, ['disabled_pwa']);
     assert.ok(active.includes('mycompany.internal.app'));
+    assert.ok(!active.includes('disabled.internal.app'));
   });
 
   test('returns null when no installed app matches URL', () => {
