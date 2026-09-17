@@ -320,6 +320,9 @@ async function moveOrReuseTab(tab, windowMode = 'popup', reuseExisting = true, i
   return true;
 }
 
+let isBatchMoving = false;
+let badgeUpdateTimer = null;
+
 /**
  * Throttled batch tab mover
  */
@@ -330,25 +333,30 @@ async function moveTabsThrottled(tabIds, windowMode = 'popup', onProgress = null
   const config = await chrome.storage.sync.get(['reuseExistingAppWindow']);
   const reuseExisting = config.reuseExistingAppWindow !== false;
 
-  for (let i = 0; i < total; i++) {
-    const tabId = tabIds[i];
-    try {
-      const tab = await chrome.tabs.get(tabId).catch(() => null);
-      if (tab) {
-        const success = await moveOrReuseTab(tab, windowMode, reuseExisting, i === total - 1);
-        if (success) movedCount++;
+  isBatchMoving = true;
+  try {
+    for (let i = 0; i < total; i++) {
+      const tabId = tabIds[i];
+      try {
+        const tab = await chrome.tabs.get(tabId).catch(() => null);
+        if (tab) {
+          const success = await moveOrReuseTab(tab, windowMode, reuseExisting, i === total - 1);
+          if (success) movedCount++;
+        }
+      } catch (err) {
+        console.warn(`Could not open tab ${tabId} in app window:`, err);
       }
-    } catch (err) {
-      console.warn(`Could not open tab ${tabId} in app window:`, err);
-    }
 
-    if (onProgress) {
-      onProgress(i + 1, total, movedCount);
-    }
+      if (onProgress) {
+        onProgress(i + 1, total, movedCount);
+      }
 
-    if (i < total - 1) {
-      await sleep(delayMs);
+      if (i < total - 1) {
+        await sleep(delayMs);
+      }
     }
+  } finally {
+    isBatchMoving = false;
   }
 
   if (movedCount > 0) {
@@ -357,6 +365,8 @@ async function moveTabsThrottled(tabIds, windowMode = 'popup', onProgress = null
     setTimeout(async () => {
       await updateBadge();
     }, 3000);
+  } else {
+    scheduleBadgeUpdate(500);
   }
 
   return movedCount;
@@ -366,6 +376,8 @@ async function moveTabsThrottled(tabIds, windowMode = 'popup', onProgress = null
  * Dynamically update the toolbar badge to show how many app tabs are detected
  */
 async function updateBadge() {
+  if (isBatchMoving) return;
+
   try {
     const config = await chrome.storage.sync.get(['windowScope']);
     const scope = config.windowScope || 'current';
@@ -382,20 +394,31 @@ async function updateBadge() {
   }
 }
 
-// Event listeners for badge updates
+/**
+ * Debounced badge updater to prevent CPU spikes from rapid tab events
+ */
+function scheduleBadgeUpdate(delayMs = 600) {
+  if (isBatchMoving) return;
+  if (badgeUpdateTimer) clearTimeout(badgeUpdateTimer);
+  badgeUpdateTimer = setTimeout(() => {
+    updateBadge();
+  }, delayMs);
+}
+
+// Event listeners for badge updates (debounced to avoid event storms)
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.status === 'complete' || changeInfo.url) {
-    updateBadge();
+    scheduleBadgeUpdate(600);
   }
 });
-chrome.tabs.onActivated.addListener(() => updateBadge());
-chrome.tabs.onRemoved.addListener(() => updateBadge());
+chrome.tabs.onActivated.addListener(() => scheduleBadgeUpdate(400));
+chrome.tabs.onRemoved.addListener(() => scheduleBadgeUpdate(400));
 chrome.windows.onFocusChanged.addListener((winId) => {
   if (winId !== chrome.windows.WINDOW_ID_NONE) {
-    updateBadge();
+    scheduleBadgeUpdate(400);
   }
 });
-chrome.storage.onChanged.addListener(() => updateBadge());
+chrome.storage.onChanged.addListener(() => scheduleBadgeUpdate(300));
 
 // Global keyboard shortcut handler (Alt+Shift+P)
 chrome.commands.onCommand.addListener(async (command) => {
