@@ -127,7 +127,14 @@ func detectChromeContext() (string, string) {
 		}
 		cmdlineStr := string(raw)
 
-		if strings.Contains(cmdlineStr, "chrome") || strings.Contains(cmdlineStr, "chromium") || strings.Contains(cmdlineStr, "brave") {
+		cmdlineLower := strings.ToLower(cmdlineStr)
+		if strings.Contains(cmdlineLower, "chrome") ||
+			strings.Contains(cmdlineLower, "chromium") ||
+			strings.Contains(cmdlineLower, "brave") ||
+			strings.Contains(cmdlineLower, "edge") ||
+			strings.Contains(cmdlineLower, "msedge") ||
+			strings.Contains(cmdlineLower, "vivaldi") ||
+			strings.Contains(cmdlineLower, "opera") {
 			if match := userDataRegex.FindStringSubmatch(cmdlineStr); len(match) > 1 {
 				userDataDir = match[1]
 			}
@@ -214,8 +221,15 @@ func loadPreferencesInstallURLs() map[string][]string {
 	}
 	candidatePaths = append(candidatePaths,
 		filepath.Join(home, ".config", "google-chrome", "Default", "Preferences"),
+		filepath.Join(home, ".config", "google-chrome-beta", "Default", "Preferences"),
 		filepath.Join(home, ".config", "chromium", "Default", "Preferences"),
 		filepath.Join(home, ".config", "BraveSoftware", "Brave-Browser", "Default", "Preferences"),
+		filepath.Join(home, ".config", "BraveSoftware", "Brave-Browser-Beta", "Default", "Preferences"),
+		filepath.Join(home, ".config", "microsoft-edge", "Default", "Preferences"),
+		filepath.Join(home, ".config", "microsoft-edge-beta", "Default", "Preferences"),
+		filepath.Join(home, ".config", "microsoft-edge-dev", "Default", "Preferences"),
+		filepath.Join(home, ".config", "vivaldi", "Default", "Preferences"),
+		filepath.Join(home, ".config", "opera", "Preferences"),
 	)
 
 	for _, p := range candidatePaths {
@@ -410,7 +424,13 @@ func findChromeBinary() string {
 		exePath := fmt.Sprintf("/proc/%d/exe", currentPID)
 		if target, err := os.Readlink(exePath); err == nil && target != "" {
 			base := strings.ToLower(filepath.Base(target))
-			if strings.Contains(base, "chrome") || strings.Contains(base, "chromium") || strings.Contains(base, "brave") {
+			if strings.Contains(base, "chrome") ||
+				strings.Contains(base, "chromium") ||
+				strings.Contains(base, "brave") ||
+				strings.Contains(base, "edge") ||
+				strings.Contains(base, "msedge") ||
+				strings.Contains(base, "vivaldi") ||
+				strings.Contains(base, "opera") {
 				return target
 			}
 		}
@@ -454,6 +474,9 @@ func findChromeBinary() string {
 		"brave",
 		"microsoft-edge-stable",
 		"microsoft-edge",
+		"msedge",
+		"vivaldi",
+		"opera",
 	}
 	for _, bin := range candidates {
 		if path, err := exec.LookPath(bin); err == nil && path != "" {

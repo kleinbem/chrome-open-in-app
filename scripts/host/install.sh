@@ -64,9 +64,17 @@ EOF
 # 3. Install manifest for supported Chromium browsers
 TARGET_DIRS=(
   "${HOME}/.config/google-chrome/NativeMessagingHosts"
+  "${HOME}/.config/google-chrome-beta/NativeMessagingHosts"
+  "${HOME}/.config/google-chrome-unstable/NativeMessagingHosts"
   "${HOME}/.config/chromium/NativeMessagingHosts"
   "${HOME}/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts"
+  "${HOME}/.config/BraveSoftware/Brave-Browser-Beta/NativeMessagingHosts"
+  "${HOME}/.config/BraveSoftware/Brave-Browser-Nightly/NativeMessagingHosts"
   "${HOME}/.config/microsoft-edge/NativeMessagingHosts"
+  "${HOME}/.config/microsoft-edge-beta/NativeMessagingHosts"
+  "${HOME}/.config/microsoft-edge-dev/NativeMessagingHosts"
+  "${HOME}/.config/vivaldi/NativeMessagingHosts"
+  "${HOME}/.config/opera/NativeMessagingHosts"
 )
 
 for dir in "${TARGET_DIRS[@]}"; do
