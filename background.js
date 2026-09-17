@@ -258,7 +258,7 @@ async function moveOrReuseTab(tab, windowMode = 'popup', reuseExisting = true, i
           if (newAppWin.tabs && newAppWin.tabs.length > 0) {
             const currentTab = newAppWin.tabs[0];
             const isAlreadyNavigating = currentTab.url === tab.url || currentTab.pendingUrl === tab.url;
-            if (!isAlreadyNavigating && currentTab.url && currentTab.url !== 'about:blank') {
+            if (!isAlreadyNavigating) {
               await chrome.tabs.update(currentTab.id, { url: tab.url, active: true }).catch(() => {});
             }
           }

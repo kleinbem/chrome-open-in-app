@@ -294,9 +294,8 @@ func main() {
 	}
 
 	if appID != "" {
-		args = append(args, fmt.Sprintf("--app-id=%s", appID))
-	}
-	if req.URL != "" {
+		args = append(args, "--new-window", fmt.Sprintf("--app-id=%s", appID))
+	} else if req.URL != "" {
 		args = append(args, fmt.Sprintf("--app=%s", req.URL))
 	}
 
