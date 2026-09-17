@@ -19,7 +19,9 @@ chrome.runtime.onInstalled.addListener(async () => {
     'windowMode',
     'windowScope',
     'ignorePinnedTabs',
-    'reuseExistingAppWindow'
+    'reuseExistingAppWindow',
+    'toolbarAction',
+    'defaultGrouping'
   ]);
 
   const updates = {};
@@ -29,10 +31,14 @@ chrome.runtime.onInstalled.addListener(async () => {
   if (!existing.windowScope) updates.windowScope = DEFAULT_CONFIG.windowScope;
   if (existing.ignorePinnedTabs === undefined) updates.ignorePinnedTabs = DEFAULT_CONFIG.ignorePinnedTabs;
   if (existing.reuseExistingAppWindow === undefined) updates.reuseExistingAppWindow = DEFAULT_CONFIG.reuseExistingAppWindow;
+  if (!existing.toolbarAction) updates.toolbarAction = DEFAULT_CONFIG.toolbarAction;
+  if (!existing.defaultGrouping) updates.defaultGrouping = DEFAULT_CONFIG.defaultGrouping;
 
   if (Object.keys(updates).length > 0) {
     await chrome.storage.sync.set(updates);
   }
+
+  await updateActionPopup(existing.toolbarAction || DEFAULT_CONFIG.toolbarAction);
 
   // Create Context Menus
   chrome.contextMenus.removeAll(() => {
@@ -50,6 +56,48 @@ chrome.runtime.onInstalled.addListener(async () => {
   });
 
   await updateBadge();
+});
+
+/**
+ * Configure Chrome action popup vs tab click behavior
+ */
+async function updateActionPopup(toolbarAction) {
+  try {
+    if (toolbarAction === 'tab') {
+      await chrome.action.setPopup({ popup: '' });
+    } else {
+      await chrome.action.setPopup({ popup: 'popup/popup.html' });
+    }
+  } catch (err) {
+    console.error('Failed to update action popup mode:', err);
+  }
+}
+
+// Ensure correct action popup mode is applied on worker wakeup
+(async () => {
+  try {
+    const data = await chrome.storage.sync.get(['toolbarAction']);
+    await updateActionPopup(data.toolbarAction || DEFAULT_CONFIG.toolbarAction);
+  } catch {
+    // Ignore storage readiness errors on immediate boot
+  }
+})();
+
+// When toolbarAction is 'tab', clicking the action icon fires chrome.action.onClicked
+chrome.action.onClicked.addListener(async () => {
+  const targetUrl = chrome.runtime.getURL('popup/popup.html?mode=tab');
+  try {
+    const tabs = await chrome.tabs.query({ url: chrome.runtime.getURL('popup/popup.html*') });
+    if (tabs.length > 0) {
+      const existingTab = tabs[0];
+      await chrome.windows.update(existingTab.windowId, { focused: true });
+      await chrome.tabs.update(existingTab.id, { active: true });
+    } else {
+      await chrome.tabs.create({ url: targetUrl });
+    }
+  } catch (err) {
+    console.error('Failed to focus or open full tab dashboard:', err);
+  }
 });
 
 /**
@@ -411,7 +459,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             'windowMode',
             'windowScope',
             'ignorePinnedTabs',
-            'reuseExistingAppWindow'
+            'reuseExistingAppWindow',
+            'toolbarAction',
+            'defaultGrouping'
           ]);
           sendResponse({
             success: true,
@@ -420,7 +470,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             windowMode: data.windowMode || DEFAULT_CONFIG.windowMode,
             windowScope: data.windowScope || DEFAULT_CONFIG.windowScope,
             ignorePinnedTabs: data.ignorePinnedTabs !== undefined ? data.ignorePinnedTabs : DEFAULT_CONFIG.ignorePinnedTabs,
-            reuseExistingAppWindow: data.reuseExistingAppWindow !== undefined ? data.reuseExistingAppWindow : DEFAULT_CONFIG.reuseExistingAppWindow
+            reuseExistingAppWindow: data.reuseExistingAppWindow !== undefined ? data.reuseExistingAppWindow : DEFAULT_CONFIG.reuseExistingAppWindow,
+            toolbarAction: data.toolbarAction || DEFAULT_CONFIG.toolbarAction,
+            defaultGrouping: data.defaultGrouping || DEFAULT_CONFIG.defaultGrouping
           });
           break;
         }
@@ -433,6 +485,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           if (message.windowScope !== undefined) updates.windowScope = message.windowScope;
           if (message.ignorePinnedTabs !== undefined) updates.ignorePinnedTabs = message.ignorePinnedTabs;
           if (message.reuseExistingAppWindow !== undefined) updates.reuseExistingAppWindow = message.reuseExistingAppWindow;
+          if (message.toolbarAction !== undefined) {
+            updates.toolbarAction = message.toolbarAction;
+            await updateActionPopup(message.toolbarAction);
+          }
+          if (message.defaultGrouping !== undefined) updates.defaultGrouping = message.defaultGrouping;
 
           await chrome.storage.sync.set(updates);
           await updateBadge();

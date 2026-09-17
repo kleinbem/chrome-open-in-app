@@ -18,6 +18,13 @@
         </div>
       </div>
       <div class="header-actions">
+        <button id="btn-open-full-tab" class="nav-btn" title="Open Dashboard in Full Browser Tab">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+        </button>
         <button id="nav-tabs-btn" class="nav-btn active" title="Tabs View">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="3" width="18" height="18" rx="3"></rect>
@@ -74,6 +81,18 @@
         </button>
       </div>
 
+      <!-- Search & Filter Bar -->
+      <div class="search-bar-container">
+        <div class="search-input-wrapper">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="tab-search-input" placeholder="Filter tabs by title, domain, or app..." autocomplete="off" spellcheck="false">
+          <button id="btn-clear-search" class="btn-clear-search" title="Clear search" style="display: none;">&times;</button>
+        </div>
+      </div>
+
       <!-- Selection Controls Bar -->
       <div class="selection-bar">
         <label class="checkbox-container">
@@ -81,13 +100,21 @@
           <span class="checkmark"></span>
           <span id="selection-count-text" class="selection-label">Select All</span>
         </label>
-        <button id="btn-refresh" class="btn-icon" title="Refresh open tabs">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <polyline points="1 20 1 14 7 14"></polyline>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-          </svg>
-        </button>
+        <div class="selection-actions">
+          <button id="btn-toggle-grouping" class="btn-pill-toggle active" title="Toggle App Grouping vs Flat List">
+            <span id="grouping-btn-text">Grouped</span>
+          </button>
+          <button id="btn-toggle-expand" class="btn-pill-toggle" title="Expand or Collapse All Groups">
+            <span id="expand-btn-text">Collapse All</span>
+          </button>
+          <button id="btn-refresh" class="btn-icon" title="Refresh open tabs">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+          </button>
+        </div>
       </div>
 
       <!-- Dynamic Tab List -->
@@ -98,6 +125,54 @@
 
     <!-- View: Settings -->
     <section id="view-settings" class="view">
+      <!-- Toolbar Action Section -->
+      <div class="settings-section">
+        <h2 class="settings-heading">Toolbar Icon Behavior</h2>
+        <p class="settings-desc">Choose what opens when you click the extension icon in Chrome's toolbar.</p>
+        
+        <div class="radio-options">
+          <label class="radio-card">
+            <input type="radio" name="toolbar-action" value="popup" id="toolbar-mode-popup" checked>
+            <div class="radio-content">
+              <span class="radio-title">Dropdown Popup (Default)</span>
+              <span class="radio-desc">Compact dropdown popup window next to the toolbar icon.</span>
+            </div>
+          </label>
+
+          <label class="radio-card">
+            <input type="radio" name="toolbar-action" value="tab" id="toolbar-mode-tab">
+            <div class="radio-content">
+              <span class="radio-title">Full Browser Tab</span>
+              <span class="radio-desc">Opens the tab manager in a wide browser tab dashboard (ideal for 100+ tabs).</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Default Tabs View Section -->
+      <div class="settings-section">
+        <h2 class="settings-heading">Default Tabs View</h2>
+        <p class="settings-desc">Choose how matching tabs are organized by default.</p>
+        
+        <div class="radio-options">
+          <label class="radio-card">
+            <input type="radio" name="default-grouping" value="grouped" id="grouping-mode-grouped" checked>
+            <div class="radio-content">
+              <span class="radio-title">Grouped by Application (Recommended)</span>
+              <span class="radio-desc">Organized into app cards with individual and group batch controls.</span>
+            </div>
+          </label>
+
+          <label class="radio-card">
+            <input type="radio" name="default-grouping" value="flat" id="grouping-mode-flat">
+            <div class="radio-content">
+              <span class="radio-title">Flat Tab List</span>
+              <span class="radio-desc">Single continuous list of all matching tabs.</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
       <!-- Window Style Section -->
       <div class="settings-section">
         <h2 class="settings-heading">Window Style</h2>
@@ -186,7 +261,7 @@
     <!-- Footer Status -->
     <footer class="app-footer">
       <span id="status-message">Ready</span>
-      <span id="version-label" class="version-label">v1.3.0</span>
+      <span id="version-label" class="version-label">v1.4.1</span>
     </footer>
   </div>
 

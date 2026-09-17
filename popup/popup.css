@@ -35,6 +35,40 @@ body {
   user-select: none;
 }
 
+body.full-tab-mode {
+  width: 100vw;
+  min-height: 100vh;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  background-color: #070a12;
+}
+
+body.full-tab-mode .app-container {
+  width: 100%;
+  max-width: 1000px;
+  min-height: 100vh;
+  border-left: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.6);
+}
+
+body.full-tab-mode #btn-open-full-tab {
+  display: none;
+}
+
+body.full-tab-mode .tabs-list {
+  max-height: none;
+  overflow-y: visible;
+}
+
+body.full-tab-mode .view {
+  padding: 20px 24px;
+}
+
 .app-container {
   display: flex;
   flex-direction: column;
@@ -692,3 +726,234 @@ input:checked + .slider:before {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
 }
+
+/* Search & Filter Bar */
+.search-bar-container {
+  margin-bottom: 8px;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 9px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+#tab-search-input {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 11.5px;
+  padding: 7px 28px 7px 30px;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+#tab-search-input:focus {
+  border-color: var(--accent-primary);
+  background: rgba(22, 32, 54, 0.95);
+}
+
+#tab-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.btn-clear-search {
+  position: absolute;
+  right: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.btn-clear-search:hover {
+  color: var(--text-primary);
+}
+
+/* Selection Controls Bar Actions */
+.selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-pill-toggle {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn-pill-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.btn-pill-toggle.active {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+/* App Group Accordion Card */
+.app-group-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.app-group-card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.app-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  user-select: none;
+  gap: 8px;
+  transition: background 0.15s ease;
+}
+
+.app-group-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.app-group-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.app-group-icon {
+  width: 17px;
+  height: 17px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.app-group-info {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.app-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.app-group-domain {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-group-badge {
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  flex-shrink: 0;
+}
+
+.app-group-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-group-move {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.btn-group-move:hover {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+}
+
+.btn-group-move:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chevron-icon {
+  transition: transform 0.2s ease;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.app-group-card.collapsed .chevron-icon {
+  transform: rotate(-90deg);
+}
+
+.app-group-body {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-color);
+}
+
+.app-group-card.collapsed .app-group-body {
+  display: none;
+}
+
+.app-group-body .tab-card {
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 0;
+  background: transparent;
+  padding: 6px 10px 6px 28px;
+}
+
+.app-group-body .tab-card:last-child {
+  border-bottom: none;
+}
+

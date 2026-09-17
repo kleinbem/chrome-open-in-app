@@ -26,7 +26,9 @@ export const DEFAULT_CONFIG = Object.freeze({
   windowMode: 'popup',          // 'popup' (frameless) or 'normal' (with toolbars)
   windowScope: 'current',       // 'current' or 'all'
   ignorePinnedTabs: true,       // whether to protect pinned tabs from batch moves
-  reuseExistingAppWindow: true  // switch to existing app/PWA window if already open
+  reuseExistingAppWindow: true, // switch to existing app/PWA window if already open
+  toolbarAction: 'popup',       // 'popup' (dropdown) or 'tab' (full tab dashboard)
+  defaultGrouping: 'grouped'    // 'grouped' (by app) or 'flat' (list)
 });
 
 // Dangerous keys that must never be processed to prevent Prototype Pollution
@@ -262,4 +264,77 @@ export function findMatchingInstalledApp(urlStr, installedApps = []) {
   }
 
   return null;
+}
+
+/**
+ * Group an array of tabs by their matched web application or domain.
+ * @param {Array<object>} tabs - Array of tab objects
+ * @param {Array<string>} activeDomains - List of active domain strings
+ * @param {Array<object>} presets - List of configured presets
+ * @returns {Array<object>} - Array of group objects: { key, name, domain, icon, tabs: [] }
+ */
+export function groupTabsByApp(tabs = [], activeDomains = [], presets = DEFAULT_PRESETS) {
+  if (!Array.isArray(tabs) || tabs.length === 0) return [];
+
+  const groupsMap = new Map();
+
+  for (const tab of tabs) {
+    if (!tab || !tab.url) continue;
+
+    let host = '';
+    try {
+      host = new URL(tab.url).hostname.toLowerCase();
+    } catch {
+      continue;
+    }
+
+    // Find if host matches any preset
+    const preset = Array.isArray(presets)
+      ? presets.find((p) => {
+          if (!p || !p.domain) return false;
+          const cleanPresetDomain = p.domain.toLowerCase().trim();
+          return host === cleanPresetDomain || host.endsWith('.' + cleanPresetDomain);
+        })
+      : null;
+
+    let groupKey = '';
+    let groupName = '';
+    let groupDomain = '';
+
+    if (preset) {
+      groupKey = preset.id || preset.domain;
+      groupName = preset.name || preset.domain;
+      groupDomain = preset.domain;
+    } else {
+      const matchedDomain = Array.isArray(activeDomains)
+        ? activeDomains.find((d) => host === d || host.endsWith('.' + d))
+        : null;
+
+      groupKey = matchedDomain || host;
+      groupDomain = matchedDomain || host;
+      const parts = groupDomain.replace(/^www\./, '').split('.');
+      const namePart = parts.length > 2 && (parts[0] === 'app' || parts[0] === 'web' || parts[0] === 'login' || parts[0] === 'cloud')
+        ? parts[1]
+        : parts[0];
+      groupName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+    }
+
+    if (!groupsMap.has(groupKey)) {
+      groupsMap.set(groupKey, {
+        key: groupKey,
+        name: groupName,
+        domain: groupDomain,
+        icon: tab.favIconUrl || '',
+        tabs: []
+      });
+    }
+
+    const group = groupsMap.get(groupKey);
+    if (!group.icon && tab.favIconUrl) {
+      group.icon = tab.favIconUrl;
+    }
+    group.tabs.push(tab);
+  }
+
+  return Array.from(groupsMap.values()).sort((a, b) => b.tabs.length - a.tabs.length);
 }

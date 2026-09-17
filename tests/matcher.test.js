@@ -7,6 +7,7 @@ import {
   filterEligibleTabs,
   findExistingAppWindow,
   findMatchingInstalledApp,
+  groupTabsByApp,
   DEFAULT_PRESETS,
   DEFAULT_CONFIG
 } from '../utils/matcher.js';
@@ -322,6 +323,48 @@ describe('Installed PWA Detection & Launch Matching', () => {
     assert.strictEqual(findMatchingInstalledApp('https://__proto__', mockInstalledApps), null);
     assert.strictEqual(findMatchingInstalledApp('https://youtube.com', null), null);
     assert.strictEqual(findMatchingInstalledApp('https://youtube.com', []), null);
+  });
+});
+
+describe('Tab Grouping by App', () => {
+  const activeDomains = ['youtube.com', 'claude.ai', 'chatgpt.com', 'app.slack.com'];
+  const sampleTabs = [
+    { id: 1, url: 'https://www.youtube.com/watch?v=1', title: 'Video 1', favIconUrl: 'https://youtube.com/fav.ico' },
+    { id: 2, url: 'https://claude.ai/chat/123', title: 'Claude Chat', favIconUrl: 'https://claude.ai/fav.ico' },
+    { id: 3, url: 'https://www.youtube.com/watch?v=2', title: 'Video 2', favIconUrl: 'https://youtube.com/fav.ico' },
+    { id: 4, url: 'https://chatgpt.com/c/abc', title: 'ChatGPT Chat', favIconUrl: '' },
+    { id: 5, url: 'https://app.slack.com/client/T1', title: 'Slack General', favIconUrl: 'https://slack.com/fav.ico' },
+    { id: 6, url: 'https://www.youtube.com/watch?v=3', title: 'Video 3', favIconUrl: 'https://youtube.com/fav.ico' }
+  ];
+
+  test('groups tabs by matched app preset and sorts by count descending', () => {
+    const groups = groupTabsByApp(sampleTabs, activeDomains, DEFAULT_PRESETS);
+    assert.strictEqual(groups.length, 4);
+
+    // Largest group first (YouTube with 3 tabs)
+    assert.strictEqual(groups[0].name, 'YouTube');
+    assert.strictEqual(groups[0].tabs.length, 3);
+    assert.deepStrictEqual(groups[0].tabs.map((t) => t.id), [1, 3, 6]);
+
+    // Other groups have 1 tab each
+    const names = groups.slice(1).map((g) => g.name).sort();
+    assert.deepStrictEqual(names, ['ChatGPT', 'Claude', 'Slack']);
+  });
+
+  test('handles custom domains without preset metadata', () => {
+    const customTabs = [
+      { id: 10, url: 'https://custom-tool.internal.corp/dashboard', title: 'Internal Tool' }
+    ];
+    const groups = groupTabsByApp(customTabs, ['custom-tool.internal.corp'], []);
+    assert.strictEqual(groups.length, 1);
+    assert.strictEqual(groups[0].name, 'Custom-tool');
+    assert.strictEqual(groups[0].domain, 'custom-tool.internal.corp');
+  });
+
+  test('returns empty array on empty or invalid inputs', () => {
+    assert.deepStrictEqual(groupTabsByApp([], activeDomains), []);
+    assert.deepStrictEqual(groupTabsByApp(null, activeDomains), []);
+    assert.deepStrictEqual(groupTabsByApp(undefined, activeDomains), []);
   });
 });
 
