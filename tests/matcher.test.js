@@ -185,6 +185,18 @@ describe('Smart App Window Reuse', () => {
     assert.ok(result);
     assert.strictEqual(result.window.id, 2);
     assert.strictEqual(result.primaryTab.id, 102);
+    assert.strictEqual(result.isExactMatch, false);
+  });
+
+  test('accurately flags isExactMatch as true for identical URLs', () => {
+    const allWindows = [
+      { id: 2, type: 'app', tabs: [{ id: 102, url: 'https://youtube.com/feed/subscriptions/' }] }
+    ];
+
+    const result = findExistingAppWindow('https://youtube.com/feed/subscriptions', allWindows, activeDomains);
+    assert.ok(result);
+    assert.strictEqual(result.window.id, 2);
+    assert.strictEqual(result.isExactMatch, true);
   });
 
   test('identifies an existing popup window for the same domain', () => {
@@ -197,6 +209,7 @@ describe('Smart App Window Reuse', () => {
     assert.ok(result);
     assert.strictEqual(result.window.id, 3);
     assert.strictEqual(result.primaryTab.id, 103);
+    assert.strictEqual(result.isExactMatch, false);
   });
 
   test('ignores standard browser windows even if domain matches', () => {

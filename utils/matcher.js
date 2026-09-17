@@ -169,11 +169,27 @@ export function filterEligibleTabs(tabs = [], activeDomains = [], options = {}) 
 }
 
 /**
- * Find an existing app window or popup window that belongs to the same web application
+ * Normalizes a URL for deduplication comparison (stripping trailing slash, hashes, tracking params)
+ */
+export function normalizeUrlForMatching(urlStr) {
+  if (!urlStr || typeof urlStr !== 'string') return '';
+  try {
+    const u = new URL(urlStr);
+    return (u.origin + u.pathname.replace(/\/+$/, '') + u.search).toLowerCase();
+  } catch {
+    return (urlStr || '').toLowerCase().trim();
+  }
+}
+
+/**
+ * Find an existing app window or popup window that belongs to the same web application.
+ * Returns { window, primaryTab, isExactMatch } or null.
+ * - isExactMatch: true ONLY if an open tab in the window has the identical URL.
+ * - isExactMatch: false if a window of the same app/domain exists but with a different URL.
  * @param {string} urlStr - The URL of the tab being moved
  * @param {Array<object>} allWindows - Array of window objects populated with tabs
  * @param {Array<string>} activeDomains - Array of configured active app domains
- * @returns {object|null} - { window, primaryTab } or null
+ * @returns {object|null} - { window, primaryTab, isExactMatch } or null
  */
 export function findExistingAppWindow(urlStr, allWindows = [], activeDomains = []) {
   if (!urlStr || typeof urlStr !== 'string' || !Array.isArray(allWindows)) return null;
@@ -193,15 +209,33 @@ export function findExistingAppWindow(urlStr, allWindows = [], activeDomains = [
 
   if (!matchedDomain) return null;
 
+  const targetNorm = normalizeUrlForMatching(urlStr);
+
+  // 1. First Priority: Check for an EXACT URL match (true duplicate page)
   for (const win of allWindows) {
-    // Recognize native PWA windows ('app') or frameless windows ('popup')
     const isAppWindow = win.type === 'app' || win.type === 'popup';
     if (isAppWindow && Array.isArray(win.tabs) && win.tabs.length > 0) {
-      const matchingTab = win.tabs.find((t) => urlMatchesApp(t.url, [matchedDomain]));
+      const exactTab = win.tabs.find((t) => t && normalizeUrlForMatching(t.url) === targetNorm);
+      if (exactTab) {
+        return {
+          window: win,
+          primaryTab: exactTab,
+          isExactMatch: true
+        };
+      }
+    }
+  }
+
+  // 2. Second: Check for any window of the same app domain (different URL)
+  for (const win of allWindows) {
+    const isAppWindow = win.type === 'app' || win.type === 'popup';
+    if (isAppWindow && Array.isArray(win.tabs) && win.tabs.length > 0) {
+      const matchingTab = win.tabs.find((t) => t && urlMatchesApp(t.url, [matchedDomain]));
       if (matchingTab) {
         return {
           window: win,
-          primaryTab: matchingTab
+          primaryTab: matchingTab,
+          isExactMatch: false
         };
       }
     }

@@ -18,10 +18,11 @@ import (
 )
 
 type Request struct {
-	URL         string `json:"url"`
-	AppID       string `json:"appId,omitempty"`
-	UserDataDir string `json:"userDataDir,omitempty"`
-	ProfileDir  string `json:"profileDir,omitempty"`
+	URL          string `json:"url"`
+	AppID        string `json:"appId,omitempty"`
+	UserDataDir  string `json:"userDataDir,omitempty"`
+	ProfileDir   string `json:"profileDir,omitempty"`
+	PreferAppURL bool   `json:"preferAppUrl,omitempty"`
 }
 
 type Response struct {
@@ -272,15 +273,19 @@ func main() {
 	}
 
 	isPWA := false
-	if appID == "" {
-		pwaID, pwaName := findInstalledPWA(req.URL)
-		if pwaID != "" {
-			appID = pwaID
+	if !req.PreferAppURL {
+		if appID == "" {
+			pwaID, pwaName := findInstalledPWA(req.URL)
+			if pwaID != "" {
+				appID = pwaID
+				isPWA = true
+				logDebug("Matched PWA '%s' with ID: %s", pwaName, pwaID)
+			}
+		} else {
 			isPWA = true
-			logDebug("Matched PWA '%s' with ID: %s", pwaName, pwaID)
 		}
 	} else {
-		isPWA = true
+		logDebug("PreferAppURL requested: launching standalone --app window for %s", req.URL)
 	}
 
 	chromeBin := findChromeBinary()
