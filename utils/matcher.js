@@ -212,33 +212,67 @@ export function findExistingAppWindow(urlStr, allWindows = [], activeDomains = [
   const targetNorm = normalizeUrlForMatching(urlStr);
 
   // 1. First Priority: Check for an EXACT URL match (true duplicate page)
+  const exactCandidates = [];
   for (const win of allWindows) {
     const isAppWindow = win.type === 'app' || win.type === 'popup';
     if (isAppWindow && Array.isArray(win.tabs) && win.tabs.length > 0) {
       const exactTab = win.tabs.find((t) => t && normalizeUrlForMatching(t.url) === targetNorm);
       if (exactTab) {
-        return {
-          window: win,
-          primaryTab: exactTab,
-          isExactMatch: true
-        };
+        exactCandidates.push({ window: win, primaryTab: exactTab });
       }
     }
   }
 
-  // 2. Second: Check for any window of the same app domain (different URL)
+  if (exactCandidates.length > 0) {
+    exactCandidates.sort((a, b) => {
+      const typeScoreA = a.window.type === 'app' ? 2 : 1;
+      const typeScoreB = b.window.type === 'app' ? 2 : 1;
+      if (typeScoreA !== typeScoreB) return typeScoreB - typeScoreA;
+      return (b.window.focused ? 1 : 0) - (a.window.focused ? 1 : 0);
+    });
+
+    return {
+      window: exactCandidates[0].window,
+      primaryTab: exactCandidates[0].primaryTab,
+      isExactMatch: true
+    };
+  }
+
+  // 2. Second Priority: Check for any window of the same app domain (different URL)
+  const candidateWindows = [];
   for (const win of allWindows) {
     const isAppWindow = win.type === 'app' || win.type === 'popup';
     if (isAppWindow && Array.isArray(win.tabs) && win.tabs.length > 0) {
       const matchingTab = win.tabs.find((t) => t && urlMatchesApp(t.url, [matchedDomain]));
       if (matchingTab) {
-        return {
-          window: win,
-          primaryTab: matchingTab,
-          isExactMatch: false
-        };
+        candidateWindows.push({ window: win, primaryTab: matchingTab });
       }
     }
+  }
+
+  if (candidateWindows.length > 0) {
+    candidateWindows.sort((a, b) => {
+      // 1. Prioritize type === 'app' (genuine PWA) over type === 'popup'
+      const typeScoreA = a.window.type === 'app' ? 2 : 1;
+      const typeScoreB = b.window.type === 'app' ? 2 : 1;
+      if (typeScoreA !== typeScoreB) return typeScoreB - typeScoreA;
+
+      // 2. Prioritize focused window
+      const focusScoreA = a.window.focused ? 1 : 0;
+      const focusScoreB = b.window.focused ? 1 : 0;
+      if (focusScoreA !== focusScoreB) return focusScoreB - focusScoreA;
+
+      // 3. Prioritize window already containing more tabs (grouping together)
+      const tabsLenA = a.window.tabs?.length || 0;
+      const tabsLenB = b.window.tabs?.length || 0;
+      return tabsLenB - tabsLenA;
+    });
+
+    return {
+      window: candidateWindows[0].window,
+      primaryTab: candidateWindows[0].primaryTab,
+      isExactMatch: false
+    };
   }
 
   return null;

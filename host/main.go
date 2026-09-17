@@ -273,19 +273,15 @@ func main() {
 	}
 
 	isPWA := false
-	if !req.PreferAppURL {
-		if appID == "" {
-			pwaID, pwaName := findInstalledPWA(req.URL)
-			if pwaID != "" {
-				appID = pwaID
-				isPWA = true
-				logDebug("Matched PWA '%s' with ID: %s", pwaName, pwaID)
-			}
-		} else {
+	if appID == "" {
+		pwaID, pwaName := findInstalledPWA(req.URL)
+		if pwaID != "" {
+			appID = pwaID
 			isPWA = true
+			logDebug("Matched PWA '%s' with ID: %s", pwaName, pwaID)
 		}
 	} else {
-		logDebug("PreferAppURL requested: launching standalone --app window for %s", req.URL)
+		isPWA = true
 	}
 
 	chromeBin := findChromeBinary()
@@ -299,6 +295,9 @@ func main() {
 
 	if appID != "" {
 		args = append(args, fmt.Sprintf("--app-id=%s", appID))
+		if req.URL != "" {
+			args = append(args, fmt.Sprintf("--app-launch-url-for-shortcuts-menu-item=%s", req.URL))
+		}
 	} else {
 		args = append(args, fmt.Sprintf("--app=%s", req.URL))
 	}

@@ -240,6 +240,18 @@ describe('Smart App Window Reuse', () => {
     assert.strictEqual(result.primaryTab.id, 202);
   });
 
+  test('prioritizes genuine PWA (type: "app") over generic popup (type: "popup")', () => {
+    const allWindows = [
+      { id: 10, type: 'popup', tabs: [{ id: 501, url: 'https://youtube.com/watch?v=oldPopup' }] },
+      { id: 20, type: 'app', tabs: [{ id: 502, url: 'https://youtube.com/feed/subscriptions' }] }
+    ];
+
+    const result = findExistingAppWindow('https://youtube.com/watch?v=newVideo', allWindows, activeDomains);
+    assert.ok(result);
+    assert.strictEqual(result.window.id, 20);
+    assert.strictEqual(result.primaryTab.id, 502);
+  });
+
   test('returns null if no window matches the domain', () => {
     const allWindows = [
       { id: 2, type: 'app', tabs: [{ id: 102, url: 'https://youtube.com/' }] }

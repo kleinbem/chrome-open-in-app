@@ -207,11 +207,52 @@ async function moveOrReuseTab(tab, windowMode = 'popup', reuseExisting = true, i
   }
 
   // 1C. In App / Popup Mode ('popup' / 'app'):
-  // If the URL is different, we MUST NOT overwrite the existing window's tab!
-  // App windows do not have tab bars, so each distinct URL gets its own clean app window.
-  const hasExistingAppInstance = Boolean(existing);
+  // If an app or popup window already exists for this app domain, add this tab directly to it!
+  // This preserves the app window's PWA identity, taskbar icon, and window frame controls.
+  if (existing && !existing.isExactMatch && existing.window.id !== tab.windowId) {
+    console.log(`[Open in App] Adding tab ${tab.id} to existing ${existing.window.type} window #${existing.window.id} for ${tab.url}`);
+    let tabAdded = false;
+
+    // First attempt: Move the live tab into the existing app window
+    try {
+      await chrome.tabs.move(tab.id, { windowId: existing.window.id, index: -1 });
+      tabAdded = true;
+    } catch (moveErr) {
+      console.log(`[Open in App] chrome.tabs.move to window #${existing.window.id} not supported, falling back to chrome.tabs.create:`, moveErr);
+      // Fallback: Create tab in existing app window and remove original tab
+      try {
+        await chrome.tabs.create({
+          windowId: existing.window.id,
+          url: tab.url,
+          active: isFocused
+        });
+        await chrome.tabs.remove(tab.id).catch(() => {});
+        tabAdded = true;
+      } catch (createErr) {
+        console.warn(`[Open in App] Failed to create tab in existing app window #${existing.window.id}:`, createErr);
+      }
+    }
+
+    if (tabAdded) {
+      if (isFocused) {
+        await chrome.windows.update(existing.window.id, { focused: true });
+        await chrome.tabs.update(tab.id, { active: true }).catch(() => {});
+      }
+      return true;
+    }
+  }
+
+  // 1D. Tab is already in the target app window:
+  if (existing && existing.window.id === tab.windowId) {
+    if (isFocused) {
+      await chrome.windows.update(existing.window.id, { focused: true });
+      await chrome.tabs.update(tab.id, { active: true }).catch(() => {});
+    }
+    return true;
+  }
 
   // 2. Genuine App Launcher via Native Messaging
+  // Only reached when NO existing app window is open for this application.
   if (typeof chrome.runtime?.sendNativeMessage === 'function') {
     try {
       const beforeWins = await chrome.windows.getAll({ windowTypes: ['normal', 'popup', 'app'] });
@@ -220,7 +261,7 @@ async function moveOrReuseTab(tab, windowMode = 'popup', reuseExisting = true, i
       const nativeRes = await new Promise((resolve) => {
         chrome.runtime.sendNativeMessage(
           'com.kleinbem.open_in_app',
-          { url: tab.url, preferAppUrl: hasExistingAppInstance },
+          { url: tab.url },
           (response) => {
             if (chrome.runtime.lastError) {
               resolve(null);
@@ -285,7 +326,7 @@ async function moveOrReuseTab(tab, windowMode = 'popup', reuseExisting = true, i
 async function moveTabsThrottled(tabIds, windowMode = 'popup', onProgress = null) {
   let movedCount = 0;
   const total = tabIds.length;
-  const delayMs = total > 15 ? 150 : 100;
+  const delayMs = total > 20 ? 50 : 80;
   const config = await chrome.storage.sync.get(['reuseExistingAppWindow']);
   const reuseExisting = config.reuseExistingAppWindow !== false;
 
