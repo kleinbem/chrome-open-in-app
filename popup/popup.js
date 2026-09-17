@@ -5,7 +5,6 @@ import {
   isSafeDomain,
   groupTabsByApp,
   getActiveDomains,
-  SUGGESTED_APP_TEMPLATES,
   DEFAULT_CONFIG
 } from '../utils/matcher.js';
 
@@ -56,9 +55,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const chkReuseExisting = document.getElementById('chk-reuse-existing');
   const installedPwasList = document.getElementById('installed-pwas-list');
   const btnRescanPwas = document.getElementById('btn-rescan-pwas');
-  const activePresetsSection = document.getElementById('active-presets-section');
-  const presetsList = document.getElementById('presets-list');
-  const catalogPresetsList = document.getElementById('catalog-presets-list');
   const customDomainsList = document.getElementById('custom-domains-list');
   const formAddCustom = document.getElementById('form-add-custom');
   const inputCustomDomain = document.getElementById('input-custom-domain');
@@ -794,8 +790,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (chkReuseExisting) chkReuseExisting.checked = currentConfig.reuseExistingAppWindow;
 
         renderInstalledPWAs();
-        renderActivePresets();
-        renderCatalogPresets();
         renderCustomDomains();
       }
     } catch (err) {
@@ -886,7 +880,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       empty.style.color = 'var(--text-muted)';
       empty.style.gridColumn = '1 / -1';
       empty.style.padding = '6px 0';
-      empty.textContent = 'No desktop PWAs detected on this machine. You can install any web app in Chrome or pick from the popular catalog below.';
+      empty.textContent = 'No desktop PWAs detected on this machine. You can add any web app domain under Custom Domains below, or install PWAs directly in Chrome via the address bar.';
       installedPwasList.appendChild(empty);
       return;
     }
@@ -930,7 +924,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         currentConfig.disabledInstalledAppIds = Array.from(currentDisabled);
         await saveConfig({ disabledInstalledAppIds: currentConfig.disabledInstalledAppIds });
-        renderCatalogPresets();
       });
 
       toggleWrap.appendChild(input);
@@ -939,121 +932,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       item.appendChild(label);
       item.appendChild(toggleWrap);
       installedPwasList.appendChild(item);
-    }
-  }
-
-  function renderActivePresets() {
-    if (!presetsList) return;
-    clearElement(presetsList);
-
-    const activeList = currentConfig.presets || [];
-    if (activePresetsSection) {
-      activePresetsSection.style.display = activeList.length > 0 ? 'block' : 'none';
-    }
-
-    for (let index = 0; index < activeList.length; index++) {
-      const preset = activeList[index];
-      const item = document.createElement('div');
-      item.className = 'preset-item';
-
-      const label = document.createElement('div');
-      label.className = 'preset-label';
-
-      const name = document.createElement('span');
-      name.className = 'preset-name';
-      name.textContent = preset.name;
-
-      const domain = document.createElement('span');
-      domain.className = 'preset-domain';
-      domain.textContent = preset.domain;
-
-      label.appendChild(name);
-      label.appendChild(domain);
-
-      const delBtn = document.createElement('button');
-      delBtn.className = 'btn-delete-custom';
-      delBtn.title = 'Remove preset';
-      delBtn.appendChild(createTrashSvgIcon());
-
-      delBtn.addEventListener('click', async () => {
-        activeList.splice(index, 1);
-        currentConfig.presets = activeList;
-        await saveConfig({ presets: currentConfig.presets });
-        renderActivePresets();
-        renderCatalogPresets();
-      });
-
-      item.appendChild(label);
-      item.appendChild(delBtn);
-      presetsList.appendChild(item);
-    }
-  }
-
-  function renderCatalogPresets() {
-    if (!catalogPresetsList) return;
-    clearElement(catalogPresetsList);
-
-    const activeDomains = new Set((currentConfig.presets || []).map(p => p.domain?.toLowerCase()));
-    const installedDomains = new Set();
-    if (Array.isArray(installedApps)) {
-      for (const app of installedApps) {
-        if (Array.isArray(app.domains)) {
-          for (const d of app.domains) installedDomains.add(d.toLowerCase());
-        }
-      }
-    }
-
-    for (const template of SUGGESTED_APP_TEMPLATES) {
-      const card = document.createElement('div');
-      card.className = 'catalog-card';
-
-      const info = document.createElement('div');
-      info.className = 'catalog-info';
-
-      const name = document.createElement('span');
-      name.className = 'catalog-name';
-      name.textContent = template.name;
-
-      const domain = document.createElement('span');
-      domain.className = 'catalog-domain';
-      domain.textContent = template.domain;
-
-      info.appendChild(name);
-      info.appendChild(domain);
-
-      const isInstalled = installedDomains.has(template.domain.toLowerCase());
-      const isPreset = activeDomains.has(template.domain.toLowerCase());
-
-      const btn = document.createElement('button');
-      if (isInstalled) {
-        btn.className = 'btn-catalog-added';
-        btn.textContent = 'Installed';
-        btn.title = 'Already installed on this computer as desktop PWA';
-      } else if (isPreset) {
-        btn.className = 'btn-catalog-added';
-        btn.textContent = 'Active';
-        btn.title = 'Already active in presets';
-      } else {
-        btn.className = 'btn-catalog-add';
-        btn.textContent = '+ Add';
-        btn.title = `Add ${template.name} (${template.domain})`;
-        btn.addEventListener('click', async () => {
-          if (!Array.isArray(currentConfig.presets)) currentConfig.presets = [];
-          currentConfig.presets.push({
-            id: template.id,
-            name: template.name,
-            domain: template.domain,
-            enabled: true
-          });
-          await saveConfig({ presets: currentConfig.presets });
-          renderActivePresets();
-          renderCatalogPresets();
-        });
-      }
-
-      card.appendChild(info);
-      card.appendChild(btn);
-      catalogPresetsList.appendChild(card);
     }
   }
 
@@ -1066,7 +944,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (res?.success && Array.isArray(res.apps)) {
           installedApps = res.apps;
           renderInstalledPWAs();
-          renderCatalogPresets();
         }
       } catch (err) {
         console.warn('Rescan failed:', err);

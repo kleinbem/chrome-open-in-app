@@ -1,43 +1,12 @@
 // Utility functions for domain matching, normalization, and tab filtering
 // Hardened against Prototype Pollution and Injection Attacks (ES2024)
 
-// Curated catalog of popular web app templates (optional suggestions for users to pick from)
-export const SUGGESTED_APP_TEMPLATES = Object.freeze([
-  { id: 'youtube', name: 'YouTube', domain: 'youtube.com', category: 'Media' },
-  { id: 'youtube_music', name: 'YouTube Music', domain: 'music.youtube.com', category: 'Media' },
-  { id: 'spotify', name: 'Spotify', domain: 'open.spotify.com', category: 'Media' },
-  { id: 'gmail', name: 'Gmail', domain: 'mail.google.com', category: 'Google' },
-  { id: 'calendar', name: 'Google Calendar', domain: 'calendar.google.com', category: 'Google' },
-  { id: 'chat', name: 'Google Chat', domain: 'chat.google.com', category: 'Google' },
-  { id: 'meet', name: 'Google Meet', domain: 'meet.google.com', category: 'Google' },
-  { id: 'keep', name: 'Google Keep', domain: 'keep.google.com', category: 'Google' },
-  { id: 'drive', name: 'Google Drive', domain: 'drive.google.com', category: 'Google' },
-  { id: 'maps', name: 'Google Maps', domain: 'maps.google.com', category: 'Google' },
-  { id: 'messages', name: 'Google Messages', domain: 'messages.google.com', category: 'Google' },
-  { id: 'gemini', name: 'Google Gemini', domain: 'gemini.google.com', category: 'AI' },
-  { id: 'ai_studio', name: 'Google AI Studio', domain: 'aistudio.google.com', category: 'AI' },
-  { id: 'chatgpt', name: 'ChatGPT', domain: 'chatgpt.com', category: 'AI' },
-  { id: 'claude', name: 'Claude', domain: 'claude.ai', category: 'AI' },
-  { id: 'deepseek', name: 'DeepSeek', domain: 'chat.deepseek.com', category: 'AI' },
-  { id: 'cloud_shell', name: 'Cloud Shell', domain: 'shell.cloud.google.com', category: 'Developer' },
-  { id: 'github', name: 'GitHub', domain: 'github.com', category: 'Developer' },
-  { id: 'slack', name: 'Slack', domain: 'app.slack.com', category: 'Productivity' },
-  { id: 'notion', name: 'Notion', domain: 'notion.so', category: 'Productivity' },
-  { id: 'figma', name: 'Figma', domain: 'figma.com', category: 'Productivity' },
-  { id: 'discord', name: 'Discord', domain: 'discord.com', category: 'Social' },
-  { id: 'whatsapp', name: 'WhatsApp Web', domain: 'web.whatsapp.com', category: 'Social' },
-  { id: 'instagram', name: 'Instagram', domain: 'instagram.com', category: 'Social' }
-]);
-
-// Provided for backward compatibility
-export const DEFAULT_PRESETS = Object.freeze(
-  SUGGESTED_APP_TEMPLATES.map((t) => ({ ...t, enabled: true }))
-);
+export const DEFAULT_PRESETS = Object.freeze([]);
 
 export const DEFAULT_CONFIG = Object.freeze({
-  presets: [],                  // empty by default; dynamically populated from discovered installed PWAs or user catalog choices
+  presets: [],                  // empty by default
   disabledInstalledAppIds: [],  // IDs of auto-detected PWAs the user chose to disable
-  customDomains: [],
+  customDomains: [],            // user-defined domains
   windowMode: 'popup',          // 'popup' (frameless) or 'normal' (with toolbars)
   windowScope: 'current',       // 'current' or 'all'
   ignorePinnedTabs: true,       // whether to protect pinned tabs from batch moves
@@ -438,13 +407,14 @@ export function groupTabsByApp(tabs = [], activeDomains = [], presets = [], inst
       });
     }
 
-    // 2. Check if host matches any preset (or catalog template)
-    const presetList = Array.isArray(presets) && presets.length > 0 ? presets : SUGGESTED_APP_TEMPLATES;
-    const matchedPreset = presetList.find((p) => {
-      if (!p || !p.domain) return false;
-      const cleanPresetDomain = p.domain.toLowerCase().trim();
-      return host === cleanPresetDomain || host.endsWith('.' + cleanPresetDomain);
-    });
+    // 2. Check if host matches any preset
+    const matchedPreset = Array.isArray(presets)
+      ? presets.find((p) => {
+          if (!p || !p.domain) return false;
+          const cleanPresetDomain = p.domain.toLowerCase().trim();
+          return host === cleanPresetDomain || host.endsWith('.' + cleanPresetDomain);
+        })
+      : null;
 
     let groupKey = '';
     let groupName = '';

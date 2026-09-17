@@ -8,7 +8,6 @@ import {
   findExistingAppWindow,
   findMatchingInstalledApp,
   groupTabsByApp,
-  SUGGESTED_APP_TEMPLATES,
   DEFAULT_PRESETS,
   DEFAULT_CONFIG
 } from '../utils/matcher.js';
@@ -150,39 +149,14 @@ describe('Tab Filtering & Protection Logic', () => {
 });
 
 describe('Presets & Config Integrity', () => {
-  test('all default presets have valid IDs, names, and domains', () => {
-    assert.ok(DEFAULT_PRESETS.length >= 10);
-    const ids = new Set();
-    const domains = new Set();
-
-    for (const preset of DEFAULT_PRESETS) {
-      assert.ok(preset.id && typeof preset.id === 'string', `Invalid ID: ${preset.id}`);
-      assert.ok(preset.name && typeof preset.name === 'string', `Invalid Name: ${preset.name}`);
-      assert.ok(preset.domain && typeof preset.domain === 'string', `Invalid Domain: ${preset.domain}`);
-      assert.strictEqual(preset.enabled, true);
-
-      assert.ok(!ids.has(preset.id), `Duplicate preset ID: ${preset.id}`);
-      assert.ok(!domains.has(preset.domain), `Duplicate preset domain: ${preset.domain}`);
-      ids.add(preset.id);
-      domains.add(preset.domain);
-    }
-  });
-
-  test('suggested app templates catalog has valid categories', () => {
-    assert.ok(Array.isArray(SUGGESTED_APP_TEMPLATES));
-    assert.ok(SUGGESTED_APP_TEMPLATES.length >= 10);
-    for (const t of SUGGESTED_APP_TEMPLATES) {
-      assert.ok(t.category && typeof t.category === 'string');
-      assert.ok(t.name && t.domain);
-    }
-  });
-
-  test('default configuration has valid properties and clean initial presets', () => {
+  test('default configuration has clean initial state with zero forced presets', () => {
+    assert.deepStrictEqual(DEFAULT_PRESETS, []);
     assert.strictEqual(DEFAULT_CONFIG.windowMode, 'popup');
     assert.strictEqual(DEFAULT_CONFIG.windowScope, 'current');
     assert.strictEqual(DEFAULT_CONFIG.ignorePinnedTabs, true);
     assert.strictEqual(DEFAULT_CONFIG.reuseExistingAppWindow, true);
     assert.ok(Array.isArray(DEFAULT_CONFIG.presets));
+    assert.strictEqual(DEFAULT_CONFIG.presets.length, 0); // No static presets forced
     assert.ok(Array.isArray(DEFAULT_CONFIG.disabledInstalledAppIds));
     assert.ok(Array.isArray(DEFAULT_CONFIG.customDomains));
   });
@@ -426,8 +400,14 @@ describe('Tab Grouping by App', () => {
     { id: 6, url: 'https://www.youtube.com/watch?v=3', title: 'Video 3', favIconUrl: 'https://youtube.com/fav.ico' }
   ];
 
-  test('groups tabs by matched app preset and sorts by count descending', () => {
-    const groups = groupTabsByApp(sampleTabs, activeDomains, DEFAULT_PRESETS);
+  test('groups tabs by matched installed PWA or domain and sorts by count descending', () => {
+    const installedApps = [
+      { id: 'yt', name: 'YouTube', domains: ['youtube.com'] },
+      { id: 'claude', name: 'Claude', domains: ['claude.ai'] },
+      { id: 'chatgpt', name: 'ChatGPT', domains: ['chatgpt.com'] },
+      { id: 'slack', name: 'Slack', domains: ['app.slack.com'] }
+    ];
+    const groups = groupTabsByApp(sampleTabs, activeDomains, [], installedApps);
     assert.strictEqual(groups.length, 4);
 
     // Largest group first (YouTube with 3 tabs)
