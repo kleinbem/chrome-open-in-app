@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.0] — 2026-09-17
+
+### Changed
+* **100% Dynamic PWA Architecture**: Completely eliminated all hardcoded presets, static app lists, and opinionated catalogs. The extension now discovers installed desktop PWAs on-the-fly from the user's OS (`~/.local/share/applications/`) and Chrome management API.
+* **Streamlined UI**: Replaced the static catalog with a clean view of auto-detected installed PWAs, selective per-app toggles, and user-defined custom domains.
+
+### Added
+* **Selective App Disabling**: Users can toggle off specific auto-detected PWAs in Settings (`disabledInstalledAppIds`) without uninstalling the desktop app from their operating system.
+* **Broadened Chromium & Compositor Support**:
+  * Native messaging host support extended across all major Chromium browsers: Google Chrome (Stable/Beta/Unstable), Chromium, Brave (Stable/Beta/Nightly), Microsoft Edge (Stable/Beta/Dev), Vivaldi, and Opera.
+  * Native host dynamically identifies parent process (`/proc/$PPID/exe` and cmdline) to invoke the exact running browser binary.
+  * Full native compatibility with KDE Plasma and Wayland compositors like Hyprland (assigns native `app_id` / `class: chrome-<appId>-Default` for window rules and Waybar/taskbar icons).
+* **Cross-Compiled Native Host Binaries**: Rebuilt host binaries with enhanced browser resolution and process detection.
+
+---
+
 ## [1.4.0] — 2026-09-16
 
 ### Added
