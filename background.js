@@ -190,10 +190,10 @@ async function getInstalledPWAs(forceRefresh = false) {
 /**
  * Get active domains helper incorporating presets, custom domains, and discovered PWAs
  */
-async function loadActiveDomains() {
+async function loadActiveDomains(forceRefresh = false) {
   const [data, installedApps] = await Promise.all([
     chrome.storage.sync.get(['presets', 'customDomains', 'disabledInstalledAppIds']),
-    getInstalledPWAs()
+    getInstalledPWAs(forceRefresh)
   ]);
   return getActiveDomains(
     data.presets || [],
@@ -206,8 +206,8 @@ async function loadActiveDomains() {
 /**
  * Query matching tabs based on scope ('current' or 'all') and settings
  */
-async function getMatchingTabs(scope = 'current') {
-  const activeDomains = await loadActiveDomains();
+async function getMatchingTabs(scope = 'current', forceRefresh = false) {
+  const activeDomains = await loadActiveDomains(forceRefresh);
   if (activeDomains.length === 0) return [];
 
   const config = await chrome.storage.sync.get(['ignorePinnedTabs']);
@@ -541,7 +541,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       switch (message.action) {
         case 'GET_MATCHING_TABS': {
           const scope = message.scope || 'current';
-          const tabs = await getMatchingTabs(scope);
+          const tabs = await getMatchingTabs(scope, Boolean(message.forceRefresh));
           sendResponse({ success: true, tabs });
           break;
         }

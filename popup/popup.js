@@ -222,7 +222,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   btnRefresh.addEventListener('click', () => {
-    refreshTabs();
+    refreshTabs(true);
   });
 
   // Search input filtering
@@ -296,14 +296,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Refresh tabs from background worker
-  async function refreshTabs() {
+  async function refreshTabs(forceRefresh = false) {
     showPlaceholder(tabsList, 'Scanning open tabs...', 'loading-state');
     btnMoveSelected.disabled = true;
 
     try {
       const response = await chrome.runtime.sendMessage({
         action: 'GET_MATCHING_TABS',
-        scope: currentConfig.windowScope
+        scope: currentConfig.windowScope,
+        forceRefresh
       });
 
       if (!response || !response.success) {
@@ -461,7 +462,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   console.log(`[Open in App v${manifestVersion}] Popup UI initialized`);
 
-  await refreshTabs();
+  await refreshTabs(true);
   await updateDiagnostics({
     diagWinCount: document.getElementById('diag-windows-count'),
     diagWinTypes: document.getElementById('diag-window-types'),

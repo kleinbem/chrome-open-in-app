@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -31,6 +32,8 @@ type PWAInfo struct {
 	StartupWMClass string   `json:"startupWmClass,omitempty"`
 	Domains        []string `json:"domains,omitempty"`
 	DesktopFile    string   `json:"desktopFile,omitempty"`
+	UserDataDir    string   `json:"userDataDir,omitempty"`
+	ProfileDir     string   `json:"profileDir,omitempty"`
 }
 
 type Response struct {
@@ -50,8 +53,10 @@ var (
 	wmClassRegex  = regexp.MustCompile(`(?m)^StartupWMClass=(.*)$`)
 	shortcutRegex = regexp.MustCompile(`--app-launch-url-for-shortcuts-menu-item=(https?://[^ \n"']+)`)
 	urlRegex      = regexp.MustCompile(`https?://[a-zA-Z0-9\.\-]+[^\s"']*`)
-	userDataRegex = regexp.MustCompile(`--user-data-dir=([^ \x00\t\r\n]+)`)
-	profileRegex  = regexp.MustCompile(`--profile-directory=([^ \x00\t\r\n]+)`)
+	userDataRegex = regexp.MustCompile(`--user-data-dir=([^ \x00\t\r\n"']+)`)
+	profileRegex  = regexp.MustCompile(`--profile-directory=([^ \x00\t\r\n"']+)`)
+	leveldbAppRe  = regexp.MustCompile(`web_apps-dt-([a-p0-9]{32})`)
+	leveldbURLRe  = regexp.MustCompile(`https?://[a-zA-Z0-9\.\-_]+(/[^\x00-\x1f\x7f-\xff]*)?`)
 )
 
 func logFile() string {
@@ -174,57 +179,132 @@ func detectChromeContext() (string, string) {
 	return userDataDir, profileDir
 }
 
-// loadPreferencesInstallURLs attempts to extract web_app.app_id.install_url from Chrome Preferences
-func loadPreferencesInstallURLs() map[string][]string {
-	result := make(map[string][]string)
+// generateAppID computes Chromium's double-SHA256 App ID for a given start URL or manifest ID
+func generateAppID(manifestIDOrURL string) string {
+	h1 := sha256.Sum256([]byte(manifestIDOrURL))
+	h2 := sha256.Sum256(h1[:])
+	var sb strings.Builder
+	sb.Grow(32)
+	for i := 0; i < 16; i++ {
+		b := h2[i]
+		sb.WriteByte('a' + (b >> 4))
+		sb.WriteByte('a' + (b & 0x0f))
+	}
+	return sb.String()
+}
+
+// loadPWAAppIdToDomains dynamically extracts app ID -> domain mappings from browser Preferences and Sync LevelDB
+func loadPWAAppIdToDomains(desktopFiles []string) map[string][]string {
+	appMap := make(map[string]map[string]bool)
+	addDomain := func(appID, rawURL string) {
+		if appID == "" || rawURL == "" {
+			return
+		}
+		if u, err := url.Parse(rawURL); err == nil && u.Hostname() != "" {
+			host := strings.ToLower(u.Hostname())
+			if appMap[appID] == nil {
+				appMap[appID] = make(map[string]bool)
+			}
+			appMap[appID][host] = true
+		}
+	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return result
+		return make(map[string][]string)
 	}
 
-	userDataDir, profileDir := detectChromeContext()
-	candidatePaths := []string{}
-	if userDataDir != "" && profileDir != "" {
-		candidatePaths = append(candidatePaths, filepath.Join(userDataDir, profileDir, "Preferences"))
+	candidateDirs := []string{
+		filepath.Join(home, ".config", "google-chrome"),
+		filepath.Join(home, ".gemini", "antigravity-browser-profile"),
+		filepath.Join(home, ".config", "google-chrome-beta"),
+		filepath.Join(home, ".config", "chromium"),
+		filepath.Join(home, ".config", "BraveSoftware", "Brave-Browser"),
+		filepath.Join(home, ".config", "BraveSoftware", "Brave-Browser-Beta"),
+		filepath.Join(home, ".config", "microsoft-edge"),
+		filepath.Join(home, ".config", "microsoft-edge-beta"),
+		filepath.Join(home, ".config", "microsoft-edge-dev"),
+		filepath.Join(home, ".config", "vivaldi"),
+		filepath.Join(home, ".config", "opera"),
 	}
-	candidatePaths = append(candidatePaths,
-		filepath.Join(home, ".config", "google-chrome", "Default", "Preferences"),
-		filepath.Join(home, ".config", "google-chrome-beta", "Default", "Preferences"),
-		filepath.Join(home, ".config", "chromium", "Default", "Preferences"),
-		filepath.Join(home, ".config", "BraveSoftware", "Brave-Browser", "Default", "Preferences"),
-		filepath.Join(home, ".config", "BraveSoftware", "Brave-Browser-Beta", "Default", "Preferences"),
-		filepath.Join(home, ".config", "microsoft-edge", "Default", "Preferences"),
-		filepath.Join(home, ".config", "microsoft-edge-beta", "Default", "Preferences"),
-		filepath.Join(home, ".config", "microsoft-edge-dev", "Default", "Preferences"),
-		filepath.Join(home, ".config", "vivaldi", "Default", "Preferences"),
-		filepath.Join(home, ".config", "opera", "Preferences"),
-	)
 
-	for _, p := range candidatePaths {
-		data, err := os.ReadFile(p)
-		if err != nil {
+	userDataDir, _ := detectChromeContext()
+	if userDataDir != "" {
+		candidateDirs = append(candidateDirs, userDataDir)
+	}
+
+	for _, df := range desktopFiles {
+		if c, err := os.ReadFile(df); err == nil {
+			if m := userDataRegex.FindStringSubmatch(string(c)); len(m) > 1 {
+				candidateDirs = append(candidateDirs, m[1])
+			}
+		}
+	}
+
+	seenDirs := make(map[string]bool)
+	for _, baseDir := range candidateDirs {
+		if baseDir == "" || seenDirs[baseDir] {
 			continue
 		}
+		seenDirs[baseDir] = true
 
-		var prefMap struct {
-			WebApp struct {
-				AppID struct {
-					InstallURL map[string][]string `json:"install_url"`
-				} `json:"app_id"`
-			} `json:"web_app"`
+		// 1. Scan Preferences files across profiles (Default, Profile 1, etc.)
+		prefFiles, _ := filepath.Glob(filepath.Join(baseDir, "*", "Preferences"))
+		if singlePref := filepath.Join(baseDir, "Preferences"); len(prefFiles) == 0 {
+			prefFiles = append(prefFiles, singlePref)
 		}
-		if err := json.Unmarshal(data, &prefMap); err == nil {
-			for aid, urls := range prefMap.WebApp.AppID.InstallURL {
-				for _, rawURL := range urls {
-					if u, err := url.Parse(rawURL); err == nil && u.Hostname() != "" {
-						h := strings.ToLower(u.Hostname())
-						result[aid] = append(result[aid], h)
+		for _, pf := range prefFiles {
+			data, err := os.ReadFile(pf)
+			if err != nil {
+				continue
+			}
+			var root struct {
+				WebApps struct {
+					DailyMetrics map[string]struct {
+						Installed bool `json:"installed"`
+					} `json:"daily_metrics"`
+				} `json:"web_apps"`
+			}
+			if err := json.Unmarshal(data, &root); err == nil {
+				for rawURL, metric := range root.WebApps.DailyMetrics {
+					if metric.Installed {
+						aid := generateAppID(rawURL)
+						addDomain(aid, rawURL)
 					}
 				}
 			}
-			if len(result) > 0 {
-				break
+		}
+
+		// 2. Scan Sync Data LevelDB files (*.ldb and *.log)
+		ldbFiles, _ := filepath.Glob(filepath.Join(baseDir, "*", "Sync Data", "LevelDB", "*.ldb"))
+		logFiles, _ := filepath.Glob(filepath.Join(baseDir, "*", "Sync Data", "LevelDB", "*.log"))
+		allDBFiles := append(ldbFiles, logFiles...)
+		for _, dbf := range allDBFiles {
+			content, err := os.ReadFile(dbf)
+			if err != nil || len(content) == 0 {
+				continue
 			}
+			matches := leveldbAppRe.FindAllSubmatchIndex(content, -1)
+			for _, loc := range matches {
+				if len(loc) >= 4 {
+					aid := string(content[loc[2]:loc[3]])
+					endIdx := loc[1] + 300
+					if endIdx > len(content) {
+						endIdx = len(content)
+					}
+					sub := content[loc[1]:endIdx]
+					if urlMatch := leveldbURLRe.Find(sub); urlMatch != nil {
+						addDomain(aid, string(urlMatch))
+					}
+				}
+			}
+		}
+	}
+
+	result := make(map[string][]string)
+	for aid, doms := range appMap {
+		for d := range doms {
+			result[aid] = append(result[aid], d)
 		}
 	}
 	return result
@@ -245,7 +325,7 @@ func listInstalledPWAs() []PWAInfo {
 		return nil
 	}
 
-	prefInstallURLs := loadPreferencesInstallURLs()
+	appIdToDomains := loadPWAAppIdToDomains(desktopFiles)
 
 	seenIDs := make(map[string]bool)
 	var apps []PWAInfo
@@ -281,6 +361,16 @@ func listInstalledPWAs() []PWAInfo {
 			wmClass = strings.TrimSpace(wm[1])
 		}
 
+		userDataDir := ""
+		if ud := userDataRegex.FindStringSubmatch(contentStr); len(ud) > 1 {
+			userDataDir = strings.TrimSpace(ud[1])
+		}
+
+		profileDir := ""
+		if pd := profileRegex.FindStringSubmatch(contentStr); len(pd) > 1 {
+			profileDir = strings.TrimSpace(pd[1])
+		}
+
 		var domains []string
 		domainSet := make(map[string]bool)
 
@@ -310,9 +400,9 @@ func listInstalledPWAs() []PWAInfo {
 			}
 		}
 
-		// 3. Extract from Chrome Preferences install_url
-		if prefHosts, ok := prefInstallURLs[appID]; ok {
-			for _, h := range prefHosts {
+		// 3. Extract from dynamic Preferences / Sync LevelDB extraction
+		if dynamicDomains, ok := appIdToDomains[appID]; ok {
+			for _, h := range dynamicDomains {
 				if !domainSet[h] {
 					domainSet[h] = true
 					domains = append(domains, h)
@@ -328,19 +418,21 @@ func listInstalledPWAs() []PWAInfo {
 			StartupWMClass: wmClass,
 			Domains:        domains,
 			DesktopFile:    filepath.Base(file),
+			UserDataDir:    userDataDir,
+			ProfileDir:     profileDir,
 		})
 	}
 
 	return apps
 }
 
-func findInstalledPWA(targetURL string) (string, string) {
+func findInstalledPWA(targetURL string) *PWAInfo {
 	if targetURL == "" {
-		return "", ""
+		return nil
 	}
 	parsed, err := url.Parse(targetURL)
 	if err != nil || parsed.Hostname() == "" {
-		return "", ""
+		return nil
 	}
 	targetHost := strings.ToLower(parsed.Hostname())
 
@@ -348,12 +440,13 @@ func findInstalledPWA(targetURL string) (string, string) {
 	for _, app := range apps {
 		for _, d := range app.Domains {
 			if targetHost == d || strings.HasSuffix(targetHost, "."+d) {
-				return app.ID, app.Name
+				appCopy := app
+				return &appCopy
 			}
 		}
 	}
 
-	return "", ""
+	return nil
 }
 
 // findChromeBinary dynamically resolves the running browser binary from parent PID
@@ -472,15 +565,33 @@ func main() {
 	}
 
 	isPWA := false
-	if appID == "" && req.URL != "" {
-		pwaID, pwaName := findInstalledPWA(req.URL)
-		if pwaID != "" {
-			appID = pwaID
-			isPWA = true
-			logDebug("Matched PWA '%s' with ID: %s for %s", pwaName, pwaID, req.URL)
+	var matchedApp *PWAInfo
+
+	if appID != "" {
+		for _, a := range listInstalledPWAs() {
+			if a.ID == appID {
+				appCopy := a
+				matchedApp = &appCopy
+				break
+			}
 		}
-	} else if appID != "" {
 		isPWA = true
+	} else if req.URL != "" {
+		matchedApp = findInstalledPWA(req.URL)
+		if matchedApp != nil {
+			appID = matchedApp.ID
+			isPWA = true
+			logDebug("Matched PWA '%s' with ID: %s for %s", matchedApp.Name, appID, req.URL)
+		}
+	}
+
+	if matchedApp != nil {
+		if userDir == "" && matchedApp.UserDataDir != "" {
+			userDir = matchedApp.UserDataDir
+		}
+		if profDir == "" && matchedApp.ProfileDir != "" {
+			profDir = matchedApp.ProfileDir
+		}
 	}
 
 	chromeBin := findChromeBinary()

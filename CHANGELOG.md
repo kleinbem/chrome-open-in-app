@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.1] — 2026-09-17
+
+### Fixed
+* **PWA Domain Resolution for Gemini, Claude, and Shortcut-less PWAs**: Resolved an issue where PWAs installed without explicit shortcut actions in their `.desktop` file (such as Google Gemini, Claude, and ChatGPT) had empty domain lists and fell back to launching generic popup windows rather than true native PWAs (`--app-id=...`).
+* **Chromium Deterministic App ID Derivation**: Implemented Chromium's exact double-SHA256 nibble-encoding algorithm in Go (`generateAppID`) to mathematically derive App IDs directly from web app URLs (e.g. `https://gemini.google.com/app` -> `gdfaincndogidkdcdkhapmbffkckdkhn`).
+* **Multi-Profile & LevelDB PWA Discovery**: Dynamically scans `web_apps.daily_metrics` in browser preferences and Chromium Sync LevelDB records across all profiles (including custom `--user-data-dir` profiles).
+* **Browser Profile Preservation**: Propagates `--user-data-dir` and `--profile-directory` from desktop launchers so PWAs run in their native profile container.
+* **Go Unit Test Suite**: Added automated tests in `host/main_test.go` covering App ID hashing, PWA desktop file discovery, and URL matching.
+
+---
+
 ## [1.5.0] — 2026-09-17
 
 ### Changed
