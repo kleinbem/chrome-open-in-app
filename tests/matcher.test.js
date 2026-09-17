@@ -353,6 +353,40 @@ describe('Installed PWA Detection & Launch Matching', () => {
     assert.strictEqual(match, null);
   });
 
+  test('matches dynamic OS desktop PWA by domains array', () => {
+    const desktopPwas = [
+      {
+        id: 'gdfaincndogidkdcdkhapmbffkckdkhn',
+        name: 'Google Gemini',
+        startupWmClass: 'crx_gdfaincndogidkdcdkhapmbffkckdkhn',
+        domains: ['gemini.google.com']
+      },
+      {
+        id: 'cadlkienfkclaiaibeoongdcgmdikeeg',
+        name: 'ChatGPT',
+        startupWmClass: 'crx_cadlkienfkclaiaibeoongdcgmdikeeg',
+        domains: ['chatgpt.com']
+      }
+    ];
+
+    const geminiMatch = findMatchingInstalledApp('https://gemini.google.com/app/12345', desktopPwas);
+    assert.ok(geminiMatch);
+    assert.strictEqual(geminiMatch.id, 'gdfaincndogidkdcdkhapmbffkckdkhn');
+    assert.strictEqual(geminiMatch.name, 'Google Gemini');
+
+    const chatgptMatch = findMatchingInstalledApp('https://chatgpt.com/c/chat123', desktopPwas);
+    assert.ok(chatgptMatch);
+    assert.strictEqual(chatgptMatch.id, 'cadlkienfkclaiaibeoongdcgmdikeeg');
+  });
+
+  test('getActiveDomains dynamically incorporates domains from installed PWAs', () => {
+    const desktopPwas = [
+      { id: 'custom_pwa', name: 'Custom PWA', domains: ['mycompany.internal.app'] }
+    ];
+    const active = getActiveDomains([], [], desktopPwas);
+    assert.ok(active.includes('mycompany.internal.app'));
+  });
+
   test('returns null when no installed app matches URL', () => {
     const match = findMatchingInstalledApp('https://news.ycombinator.com', mockInstalledApps);
     assert.strictEqual(match, null);

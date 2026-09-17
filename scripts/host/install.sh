@@ -7,9 +7,29 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 TARGET_BIN="${HOME}/.local/bin/chrome-open-in-app-host"
-EXTENSION_ID="${1:-ngfknlddgkbipaimbaihckmaodkmndoa}"
+# Dynamically calculate extension ID matching Chromium unpacked extension derivation
+DERIVED_ID=$(python3 -c '
+import hashlib
+path = "'"${REPO_ROOT}"'"
+h = hashlib.sha256(path.encode("utf-8")).hexdigest()[:32]
+print("".join([chr(ord("a") + int(c, 16)) for c in h]))
+' 2>/dev/null || echo "ngfknlddgkbipaimbaihckmaodkmndoa")
+
+# Build allowed origins list
+ORIGINS_SET=()
+ORIGINS_SET+=("chrome-extension://${DERIVED_ID}/")
+ORIGINS_SET+=("chrome-extension://ngfknlddgkbipaimbaihckmaodkmndoa/")
+if [ -n "${1:-}" ]; then
+  ORIGINS_SET+=("chrome-extension://${1}/")
+fi
+
+# Deduplicate origins
+UNIQUE_ORIGINS=($(printf "%s\n" "${ORIGINS_SET[@]}" | sort -u))
+ORIGINS_JSON=$(printf '    "%s",\n' "${UNIQUE_ORIGINS[@]}" | sed '$ s/,$//')
 
 echo "Installing Open in App Native Messaging Host (Go binary)..."
+echo "Target repo: ${REPO_ROOT}"
+echo "Derived Extension ID: ${DERIVED_ID}"
 
 # 1. Build and install executable
 mkdir -p "${HOME}/.local/bin"
@@ -35,7 +55,7 @@ MANIFEST_JSON=$(cat <<EOF
   "path": "${TARGET_BIN}",
   "type": "stdio",
   "allowed_origins": [
-    "chrome-extension://${EXTENSION_ID}/"
+${ORIGINS_JSON}
   ]
 }
 EOF
@@ -57,5 +77,8 @@ done
 
 echo ""
 echo "Installation complete!"
-echo "Extension ID authorized: ${EXTENSION_ID}"
-echo "Restart Chrome to ensure the new native host is recognized."
+echo "Extension origins authorized:"
+for orig in "${UNIQUE_ORIGINS[@]}"; do
+  echo "  - ${orig}"
+done
+echo "Restart Chrome or reload extension to ensure the new native host is recognized."

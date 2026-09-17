@@ -4,6 +4,7 @@ import {
   getActiveDomains,
   filterEligibleTabs,
   findExistingAppWindow,
+  findMatchingInstalledApp,
   DEFAULT_CONFIG
 } from './utils/matcher.js';
 
@@ -99,12 +100,71 @@ chrome.action.onClicked.addListener(async () => {
   }
 });
 
+let cachedInstalledPWAs = [];
+let lastPwaFetchTime = 0;
+
 /**
- * Get active domains helper
+ * Query native host for installed PWAs with in-memory caching
+ */
+async function getInstalledPWAs(forceRefresh = false) {
+  const now = Date.now();
+  if (!forceRefresh && cachedInstalledPWAs.length > 0 && (now - lastPwaFetchTime < 5 * 60 * 1000)) {
+    return cachedInstalledPWAs;
+  }
+
+  if (typeof chrome.runtime?.sendNativeMessage === 'function') {
+    try {
+      const res = await new Promise((resolve) => {
+        chrome.runtime.sendNativeMessage(
+          'com.kleinbem.open_in_app',
+          { action: 'LIST_APPS' },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              resolve(null);
+            } else {
+              resolve(response);
+            }
+          }
+        );
+      });
+
+      if (res?.success && Array.isArray(res.apps)) {
+        cachedInstalledPWAs = res.apps;
+        lastPwaFetchTime = now;
+        console.log(`[Open in App] Dynamically cached ${cachedInstalledPWAs.length} installed PWAs from host`);
+        return cachedInstalledPWAs;
+      }
+    } catch (err) {
+      console.warn('[Open in App] Native host PWA discovery bypassed:', err);
+    }
+  }
+
+  // Fallback to chrome.management.getAll() if native host is unavailable
+  if (typeof chrome.management?.getAll === 'function') {
+    try {
+      const allExtensions = await chrome.management.getAll();
+      const apps = allExtensions.filter((item) =>
+        item.type === 'hosted_app' || item.type === 'packaged_app' || Boolean(item.appLaunchUrl)
+      );
+      if (apps.length > 0) {
+        cachedInstalledPWAs = apps;
+        lastPwaFetchTime = now;
+      }
+    } catch {}
+  }
+
+  return cachedInstalledPWAs;
+}
+
+/**
+ * Get active domains helper incorporating presets, custom domains, and discovered PWAs
  */
 async function loadActiveDomains() {
-  const data = await chrome.storage.sync.get(['presets', 'customDomains']);
-  return getActiveDomains(data.presets, data.customDomains);
+  const [data, installedApps] = await Promise.all([
+    chrome.storage.sync.get(['presets', 'customDomains']),
+    getInstalledPWAs()
+  ]);
+  return getActiveDomains(data.presets, data.customDomains, installedApps);
 }
 
 /**
@@ -219,13 +279,24 @@ async function moveOrReuseTab(tab, windowMode = 'popup', reuseExisting = true, i
   // Only reached when NO existing app window is open for this application.
   if (typeof chrome.runtime?.sendNativeMessage === 'function') {
     try {
+      const installedApps = await getInstalledPWAs();
+      const matchedPWA = findMatchingInstalledApp(tab.url, installedApps);
+
+      const nativePayload = {
+        action: 'LAUNCH',
+        url: tab.url
+      };
+      if (matchedPWA?.id) {
+        nativePayload.appId = matchedPWA.id;
+      }
+
       const beforeWins = await chrome.windows.getAll({ windowTypes: ['normal', 'popup', 'app'] });
       const beforeWinIds = new Set(beforeWins.map((w) => w.id));
 
       const nativeRes = await new Promise((resolve) => {
         chrome.runtime.sendNativeMessage(
           'com.kleinbem.open_in_app',
-          { url: tab.url },
+          nativePayload,
           (response) => {
             if (chrome.runtime.lastError) {
               resolve(null);
@@ -436,6 +507,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const scope = message.scope || 'current';
           const tabs = await getMatchingTabs(scope);
           sendResponse({ success: true, tabs });
+          break;
+        }
+
+        case 'GET_INSTALLED_APPS': {
+          const apps = await getInstalledPWAs(Boolean(message.forceRefresh));
+          sendResponse({ success: true, apps });
           break;
         }
 

@@ -17,7 +17,15 @@ export const DEFAULT_PRESETS = Object.freeze([
   { id: 'chatgpt', name: 'ChatGPT', domain: 'chatgpt.com', enabled: true },
   { id: 'claude', name: 'Claude', domain: 'claude.ai', enabled: true },
   { id: 'whatsapp', name: 'WhatsApp Web', domain: 'web.whatsapp.com', enabled: true },
-  { id: 'instagram', name: 'Instagram', domain: 'instagram.com', enabled: true }
+  { id: 'instagram', name: 'Instagram', domain: 'instagram.com', enabled: true },
+  { id: 'deepseek', name: 'DeepSeek', domain: 'chat.deepseek.com', enabled: true },
+  { id: 'cloud_shell', name: 'Cloud Shell', domain: 'shell.cloud.google.com', enabled: true },
+  { id: 'slack', name: 'Slack', domain: 'app.slack.com', enabled: true },
+  { id: 'discord', name: 'Discord', domain: 'discord.com', enabled: true },
+  { id: 'spotify', name: 'Spotify', domain: 'open.spotify.com', enabled: true },
+  { id: 'notion', name: 'Notion', domain: 'notion.so', enabled: true },
+  { id: 'github', name: 'GitHub', domain: 'github.com', enabled: true },
+  { id: 'figma', name: 'Figma', domain: 'figma.com', enabled: true }
 ]);
 
 export const DEFAULT_CONFIG = Object.freeze({
@@ -86,15 +94,18 @@ export function normalizeDomain(input) {
 }
 
 /**
- * Extract an array of active, clean domain strings from presets and custom domains
+ * Extract an array of active, clean domain strings from presets, custom domains, and discovered PWAs
  */
-export function getActiveDomains(presets = [], customDomains = []) {
+export function getActiveDomains(presets = [], customDomains = [], installedApps = []) {
   const active = [];
 
   if (Array.isArray(presets)) {
     for (const p of presets) {
       if (p && p.enabled !== false && p.domain && isSafeDomain(p.domain)) {
-        active.push(normalizeDomain(p.domain));
+        const norm = normalizeDomain(p.domain);
+        if (norm && !active.includes(norm)) {
+          active.push(norm);
+        }
       }
     }
   }
@@ -107,6 +118,21 @@ export function getActiveDomains(presets = [], customDomains = []) {
         const normalized = normalizeDomain(domainStr);
         if (normalized && !active.includes(normalized)) {
           active.push(normalized);
+        }
+      }
+    }
+  }
+
+  if (Array.isArray(installedApps)) {
+    for (const app of installedApps) {
+      if (app && Array.isArray(app.domains)) {
+        for (const d of app.domains) {
+          if (isSafeDomain(d)) {
+            const normalized = normalizeDomain(d);
+            if (normalized && !active.includes(normalized)) {
+              active.push(normalized);
+            }
+          }
         }
       }
     }
@@ -320,10 +346,26 @@ export function findMatchingInstalledApp(urlStr, installedApps = []) {
   for (const app of installedApps) {
     if (!app || typeof app !== 'object' || app.enabled === false) continue;
 
-    // Must be a web app (hosted_app, packaged_app, or item with appLaunchUrl)
-    const isApp = app.type === 'hosted_app' || app.type === 'packaged_app' || Boolean(app.appLaunchUrl);
+    // Must be a web app (hosted_app, packaged_app, desktop PWA with domains/WMClass, or item with appLaunchUrl)
+    const isApp = app.type === 'hosted_app' ||
+      app.type === 'packaged_app' ||
+      Boolean(app.appLaunchUrl) ||
+      Boolean(app.startupWmClass) ||
+      Array.isArray(app.domains);
     const isExtensionOrTheme = app.type === 'extension' || app.type === 'theme';
     if (!isApp || isExtensionOrTheme) continue;
+
+    // Match via explicit domains array (from OS desktop PWA discovery)
+    if (Array.isArray(app.domains)) {
+      for (const d of app.domains) {
+        if (typeof d === 'string' && d) {
+          const cleanDom = d.toLowerCase().trim();
+          if (targetHostname === cleanDom || targetHostname.endsWith('.' + cleanDom)) {
+            return app;
+          }
+        }
+      }
+    }
 
     // Match via appLaunchUrl
     if (app.appLaunchUrl && typeof app.appLaunchUrl === 'string') {

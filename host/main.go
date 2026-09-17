@@ -18,25 +18,40 @@ import (
 )
 
 type Request struct {
-	URL          string `json:"url"`
+	Action       string `json:"action,omitempty"`
+	URL          string `json:"url,omitempty"`
 	AppID        string `json:"appId,omitempty"`
 	UserDataDir  string `json:"userDataDir,omitempty"`
 	ProfileDir   string `json:"profileDir,omitempty"`
 	PreferAppURL bool   `json:"preferAppUrl,omitempty"`
 }
 
+type PWAInfo struct {
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	Icon           string   `json:"icon,omitempty"`
+	StartupWMClass string   `json:"startupWmClass,omitempty"`
+	Domains        []string `json:"domains,omitempty"`
+	DesktopFile    string   `json:"desktopFile,omitempty"`
+}
+
 type Response struct {
-	Success  bool   `json:"success"`
-	Launched string `json:"launched,omitempty"`
-	AppID    string `json:"appId,omitempty"`
-	IsPWA    bool   `json:"isPwa"`
-	Error    string `json:"error,omitempty"`
+	Success  bool      `json:"success"`
+	Action   string    `json:"action,omitempty"`
+	Apps     []PWAInfo `json:"apps,omitempty"`
+	Launched string    `json:"launched,omitempty"`
+	AppID    string    `json:"appId,omitempty"`
+	IsPWA    bool      `json:"isPwa"`
+	Error    string    `json:"error,omitempty"`
 }
 
 var (
 	appIDRegex    = regexp.MustCompile(`--app-id=([a-z0-9]+)`)
 	nameRegex     = regexp.MustCompile(`(?m)^Name=(.*)$`)
+	iconRegex     = regexp.MustCompile(`(?m)^Icon=(.*)$`)
+	wmClassRegex  = regexp.MustCompile(`(?m)^StartupWMClass=(.*)$`)
 	shortcutRegex = regexp.MustCompile(`--app-launch-url-for-shortcuts-menu-item=(https?://[^ \n"']+)`)
+	urlRegex      = regexp.MustCompile(`https?://[a-zA-Z0-9\.\-]+[^\s"']*`)
 	userDataRegex = regexp.MustCompile(`--user-data-dir=([^ \x00\t\r\n]+)`)
 	profileRegex  = regexp.MustCompile(`--profile-directory=([^ \x00\t\r\n]+)`)
 )
@@ -112,7 +127,7 @@ func detectChromeContext() (string, string) {
 		}
 		cmdlineStr := string(raw)
 
-		if strings.Contains(cmdlineStr, "chrome") || strings.Contains(cmdlineStr, "chromium") {
+		if strings.Contains(cmdlineStr, "chrome") || strings.Contains(cmdlineStr, "chromium") || strings.Contains(cmdlineStr, "brave") {
 			if match := userDataRegex.FindStringSubmatch(cmdlineStr); len(match) > 1 {
 				userDataDir = match[1]
 			}
@@ -124,7 +139,6 @@ func detectChromeContext() (string, string) {
 			}
 		}
 
-		// Read parent PID from /proc/<pid>/status
 		statusPath := fmt.Sprintf("/proc/%d/status", currentPID)
 		statusRaw, err := os.ReadFile(statusPath)
 		if err != nil {
@@ -149,36 +163,110 @@ func detectChromeContext() (string, string) {
 	return userDataDir, profileDir
 }
 
-func findInstalledPWA(targetURL string) (string, string) {
-	if targetURL == "" {
-		return "", ""
-	}
-	parsed, err := url.Parse(targetURL)
-	if err != nil || parsed.Hostname() == "" {
-		return "", ""
-	}
-	targetHost := strings.ToLower(parsed.Hostname())
+type pwaMapping struct {
+	keyword string
+	domain  string
+}
 
+var knownPwaNames = []pwaMapping{
+	{"youtube music", "music.youtube.com"},
+	{"youtube", "youtube.com"},
+	{"gemini", "gemini.google.com"},
+	{"chatgpt", "chatgpt.com"},
+	{"claude", "claude.ai"},
+	{"deepseek", "chat.deepseek.com"},
+	{"gmail", "mail.google.com"},
+	{"calendar", "calendar.google.com"},
+	{"whatsapp", "web.whatsapp.com"},
+	{"ai studio", "aistudio.google.com"},
+	{"cloud shell", "shell.cloud.google.com"},
+	{"instagram", "instagram.com"},
+	{"kindle", "read.amazon.com"},
+	{"amazon", "amazon.co.uk"},
+	{"slack", "app.slack.com"},
+	{"discord", "discord.com"},
+	{"spotify", "open.spotify.com"},
+	{"notion", "notion.so"},
+	{"github", "github.com"},
+	{"figma", "figma.com"},
+	{"zee5", "zee5.com"},
+	{"dunnes", "dunnesstoresgrocery.com"},
+	{"firebase", "studio.firebase.google.com"},
+	{"messages", "messages.google.com"},
+	{"meet", "meet.google.com"},
+	{"drive", "drive.google.com"},
+	{"keep", "keep.google.com"},
+	{"maps", "maps.google.com"},
+}
+
+// loadPreferencesInstallURLs attempts to extract web_app.app_id.install_url from Chrome Preferences
+func loadPreferencesInstallURLs() map[string][]string {
+	result := make(map[string][]string)
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", ""
-	}
-	desktopPattern := filepath.Join(home, ".local", "share", "applications", "chrome-*-*.desktop")
-	desktopFiles, err := filepath.Glob(desktopPattern)
-	if err != nil || len(desktopFiles) == 0 {
-		return "", ""
+		return result
 	}
 
-	domainPrefix := strings.TrimPrefix(targetHost, "www.")
-	if idx := strings.Index(domainPrefix, "."); idx != -1 {
-		domainPrefix = domainPrefix[:idx]
+	userDataDir, profileDir := detectChromeContext()
+	candidatePaths := []string{}
+	if userDataDir != "" && profileDir != "" {
+		candidatePaths = append(candidatePaths, filepath.Join(userDataDir, profileDir, "Preferences"))
+	}
+	candidatePaths = append(candidatePaths,
+		filepath.Join(home, ".config", "google-chrome", "Default", "Preferences"),
+		filepath.Join(home, ".config", "chromium", "Default", "Preferences"),
+		filepath.Join(home, ".config", "BraveSoftware", "Brave-Browser", "Default", "Preferences"),
+	)
+
+	for _, p := range candidatePaths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+
+		var prefMap struct {
+			WebApp struct {
+				AppID struct {
+					InstallURL map[string][]string `json:"install_url"`
+				} `json:"app_id"`
+			} `json:"web_app"`
+		}
+		if err := json.Unmarshal(data, &prefMap); err == nil {
+			for aid, urls := range prefMap.WebApp.AppID.InstallURL {
+				for _, rawURL := range urls {
+					if u, err := url.Parse(rawURL); err == nil && u.Hostname() != "" {
+						h := strings.ToLower(u.Hostname())
+						result[aid] = append(result[aid], h)
+					}
+				}
+			}
+			if len(result) > 0 {
+				break
+			}
+		}
+	}
+	return result
+}
+
+// listInstalledPWAs dynamically scans desktop launchers across browsers (Chrome, Brave, Chromium, Edge)
+func listInstalledPWAs() []PWAInfo {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+	appDir := filepath.Join(home, ".local", "share", "applications")
+
+	// Support chrome-*, brave-*, chromium-*, and any PWA desktop launcher with app-id
+	pattern := filepath.Join(appDir, "*-[a-z0-9]*-*.desktop")
+	desktopFiles, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil
 	}
 
-	type match struct {
-		id   string
-		name string
-	}
-	var candidate *match
+	prefInstallURLs := loadPreferencesInstallURLs()
+
+	seenIDs := make(map[string]bool)
+	var apps []PWAInfo
 
 	for _, file := range desktopFiles {
 		content, err := os.ReadFile(file)
@@ -192,44 +280,180 @@ func findInstalledPWA(targetURL string) (string, string) {
 			continue
 		}
 		appID := appIDMatch[1]
+		if seenIDs[appID] {
+			continue
+		}
 
 		name := ""
 		if nm := nameRegex.FindStringSubmatch(contentStr); len(nm) > 1 {
 			name = strings.TrimSpace(nm[1])
 		}
 
-		// 1. Direct shortcut URL match
+		icon := ""
+		if ic := iconRegex.FindStringSubmatch(contentStr); len(ic) > 1 {
+			icon = strings.TrimSpace(ic[1])
+		}
+
+		wmClass := ""
+		if wm := wmClassRegex.FindStringSubmatch(contentStr); len(wm) > 1 {
+			wmClass = strings.TrimSpace(wm[1])
+		}
+
+		var domains []string
+		domainSet := make(map[string]bool)
+
+		// 1. Extract shortcut URLs
 		shortcuts := shortcutRegex.FindAllStringSubmatch(contentStr, -1)
 		for _, sm := range shortcuts {
 			if len(sm) > 1 {
-				if u, err := url.Parse(sm[1]); err == nil {
-					if strings.ToLower(u.Hostname()) == targetHost {
-						return appID, name
+				if u, err := url.Parse(sm[1]); err == nil && u.Hostname() != "" {
+					h := strings.ToLower(u.Hostname())
+					if !domainSet[h] {
+						domainSet[h] = true
+						domains = append(domains, h)
 					}
 				}
 			}
 		}
 
-		// 2. Fallback: match by domain prefix in PWA Name
-		if len(domainPrefix) > 2 && strings.Contains(strings.ToLower(name), domainPrefix) {
-			if candidate == nil {
-				candidate = &match{id: appID, name: name}
+		// 2. Extract any other URLs in the desktop file
+		allUrls := urlRegex.FindAllString(contentStr, -1)
+		for _, rawURL := range allUrls {
+			if u, err := url.Parse(rawURL); err == nil && u.Hostname() != "" {
+				h := strings.ToLower(u.Hostname())
+				if !domainSet[h] {
+					domainSet[h] = true
+					domains = append(domains, h)
+				}
+			}
+		}
+
+		// 3. Extract from Chrome Preferences install_url
+		if prefHosts, ok := prefInstallURLs[appID]; ok {
+			for _, h := range prefHosts {
+				if !domainSet[h] {
+					domainSet[h] = true
+					domains = append(domains, h)
+				}
+			}
+		}
+
+		// 4. Fallback: map by known application names
+		cleanName := strings.ToLower(name)
+		for _, m := range knownPwaNames {
+			if strings.Contains(cleanName, m.keyword) {
+				if !domainSet[m.domain] {
+					domainSet[m.domain] = true
+					domains = append(domains, m.domain)
+				}
+				break
+			}
+		}
+
+		seenIDs[appID] = true
+		apps = append(apps, PWAInfo{
+			ID:             appID,
+			Name:           name,
+			Icon:           icon,
+			StartupWMClass: wmClass,
+			Domains:        domains,
+			DesktopFile:    filepath.Base(file),
+		})
+	}
+
+	return apps
+}
+
+func findInstalledPWA(targetURL string) (string, string) {
+	if targetURL == "" {
+		return "", ""
+	}
+	parsed, err := url.Parse(targetURL)
+	if err != nil || parsed.Hostname() == "" {
+		return "", ""
+	}
+	targetHost := strings.ToLower(parsed.Hostname())
+
+	apps := listInstalledPWAs()
+	for _, app := range apps {
+		for _, d := range app.Domains {
+			if targetHost == d || strings.HasSuffix(targetHost, "."+d) {
+				return app.ID, app.Name
 			}
 		}
 	}
 
-	if candidate != nil {
-		return candidate.id, candidate.name
+	// Exact domain match based on known PWA naming heuristics without ambiguous substrings
+	domainPrefix := strings.TrimPrefix(targetHost, "www.")
+	if idx := strings.Index(domainPrefix, "."); idx != -1 {
+		domainPrefix = domainPrefix[:idx]
 	}
+	// Avoid short or common ambiguous tokens (like "app", "web", "api", "mail")
+	ambiguous := map[string]bool{"app": true, "web": true, "api": true, "auth": true, "my": true, "dashboard": true}
+	if len(domainPrefix) >= 4 && !ambiguous[domainPrefix] {
+		for _, app := range apps {
+			cleanName := strings.ToLower(strings.ReplaceAll(app.Name, " ", ""))
+			if strings.Contains(cleanName, domainPrefix) {
+				return app.ID, app.Name
+			}
+		}
+	}
+
 	return "", ""
 }
 
+// findChromeBinary dynamically resolves the running browser binary from parent PID
 func findChromeBinary() string {
+	// 1. Check if parent process points directly to browser binary
+	currentPID := os.Getppid()
+	for step := 0; step < 5 && currentPID > 1; step++ {
+		exePath := fmt.Sprintf("/proc/%d/exe", currentPID)
+		if target, err := os.Readlink(exePath); err == nil && target != "" {
+			base := strings.ToLower(filepath.Base(target))
+			if strings.Contains(base, "chrome") || strings.Contains(base, "chromium") || strings.Contains(base, "brave") {
+				return target
+			}
+		}
+
+		// Read parent PID
+		statusPath := fmt.Sprintf("/proc/%d/status", currentPID)
+		statusRaw, err := os.ReadFile(statusPath)
+		if err != nil {
+			break
+		}
+		nextPID := 0
+		for _, line := range strings.Split(string(statusRaw), "\n") {
+			if strings.HasPrefix(line, "PPid:") {
+				fields := strings.Fields(line)
+				if len(fields) >= 2 {
+					nextPID, _ = strconv.Atoi(fields[1])
+				}
+				break
+			}
+		}
+		if nextPID <= 1 || nextPID == currentPID {
+			break
+		}
+		currentPID = nextPID
+	}
+
+	// 2. Fallback to CHROME_BIN environment variable
+	if envBin := os.Getenv("CHROME_BIN"); envBin != "" {
+		if path, err := exec.LookPath(envBin); err == nil && path != "" {
+			return path
+		}
+	}
+
+	// 3. Fallback to standard PATH candidates
 	candidates := []string{
 		"google-chrome-stable",
 		"google-chrome",
 		"chromium",
 		"chromium-browser",
+		"brave-browser",
+		"brave",
+		"microsoft-edge-stable",
+		"microsoft-edge",
 	}
 	for _, bin := range candidates {
 		if path, err := exec.LookPath(bin); err == nil && path != "" {
@@ -253,9 +477,21 @@ func main() {
 		return
 	}
 
-	if req.URL == "" {
-		logDebug("No URL provided in request")
-		_ = sendMessage(writer, Response{Success: false, Error: "No URL provided"})
+	// Dynamic PWA Query Action
+	if req.Action == "LIST_APPS" || (req.URL == "" && req.AppID == "") {
+		apps := listInstalledPWAs()
+		logDebug("Listing installed PWAs: found %d apps", len(apps))
+		_ = sendMessage(writer, Response{
+			Success: true,
+			Action:  "LIST_APPS",
+			Apps:    apps,
+		})
+		return
+	}
+
+	if req.URL == "" && req.AppID == "" {
+		logDebug("No URL or AppID provided in launch request")
+		_ = sendMessage(writer, Response{Success: false, Error: "No URL or AppID provided"})
 		return
 	}
 
@@ -273,14 +509,14 @@ func main() {
 	}
 
 	isPWA := false
-	if appID == "" {
+	if appID == "" && req.URL != "" {
 		pwaID, pwaName := findInstalledPWA(req.URL)
 		if pwaID != "" {
 			appID = pwaID
 			isPWA = true
-			logDebug("Matched PWA '%s' with ID: %s", pwaName, pwaID)
+			logDebug("Matched PWA '%s' with ID: %s for %s", pwaName, pwaID, req.URL)
 		}
-	} else {
+	} else if appID != "" {
 		isPWA = true
 	}
 
@@ -310,6 +546,7 @@ func main() {
 
 	_ = sendMessage(writer, Response{
 		Success:  true,
+		Action:   "LAUNCH",
 		Launched: req.URL,
 		AppID:    appID,
 		IsPWA:    isPWA,
