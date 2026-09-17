@@ -4,19 +4,22 @@ A high-performance, production-ready Manifest V3 Google Chrome extension that ba
 
 ---
 
-## What's New in v1.4.0
+## What's New in v1.5.0
 
-* 🚀 **Native PWA Launching via `chrome.management`**: Automatically detects installed Progressive Web Apps (YouTube, Gmail, Calendar, etc.) and launches them through Chromium's native app manager (`chrome.management.launchApp`). This ensures the OS window manager assigns the native `StartupWMClass`, displaying the app with its real icon and name on the Linux/Windows taskbar or dock!
-* 🪟 **Window Type Filter Correction**: Fixed window queries to query `windowTypes: ['normal', 'popup', 'app']` across all service worker APIs. Running PWA windows (`type: 'app'`) are now fully visible, allowing instantaneous window reuse, tab updating, and focus switching.
-* 🎯 **Precise Multi-Tab Targeting**: When reusing a multi-tab PWA window, the extension targets the specific matching tab.
-* 🧪 **38 Automated Tests**: All unit tests and security audits passing (`npm test`, 100% test coverage for matchers and sinks).
+* 🌐 **100% Dynamic PWA Architecture**: Completely eliminated all hardcoded preset lists, static app catalogs, and opinionated defaults. The extension discovers installed desktop PWAs on-the-fly directly from your OS (`~/.local/share/applications/`) and Chromium's web app registry.
+* 🛡️ **Selective PWA Control**: Disable individual detected PWAs via Settings toggles (`disabledInstalledAppIds`) without needing to uninstall them from your desktop.
+* 🚀 **Cross-Browser & Compositor Support**: First-class support for Google Chrome, Brave, Microsoft Edge, Chromium, Vivaldi, and Opera. Full Wayland compatibility for KDE Plasma (panel icon grouping) and Hyprland (assigns `class: chrome-<appId>-Default` for easy window rules).
+* ⚡ **Optimized Native Messaging**: Detached non-blocking process launching (`cmd.Start`), opt-in debug logging (`OPEN_IN_APP_DEBUG=1`), and persistent storage caching in `chrome.storage.local`.
+* 🧪 **46 Automated Tests**: Complete test coverage (`npm test`) across domain normalizers, URL matching, PWA detection, and prototype pollution defenses.
 * 📜 **Changelog**: Comprehensive release notes maintained in [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
 ## Key Features
 
-* **1-Click Batch Open**: Instantly scans open tabs and opens all matching web apps (Gmail, YouTube, Calendar, Chat, etc.) into their own dedicated windows.
+* **Dynamic PWA Discovery**: Automatically detects what PWAs are *actually installed on your machine* and offers 1-click batch detached app windows.
+* **Custom Domain Manager**: Add any custom intranet, self-hosted (Home Assistant, Grafana, Portainer), or arbitrary web app domain.
+* **1-Click Batch Open**: Instantly scans open tabs and opens all matching web apps into their own dedicated windows.
 * **Smooth Multi-Tab Throttling**: Batch-moves 20, 50, or 100+ tabs without stuttering or freezing Chrome using an asynchronous spaced queue.
 * **Dual Window Modes**:
   * **Frameless App Mode (Default):** Clean, distraction-free app-like windows without URL bars or tabs.
@@ -26,8 +29,6 @@ A high-performance, production-ready Manifest V3 Google Chrome extension that ba
 * **Real-time Progress Bar**: Visual feedback displaying move progress in real time.
 * **Preserves Live State**: Uses native tab reparenting — your media playback (audio/video), unsaved form text, and active sessions are **never interrupted or reloaded**.
 * **Global Shortcut**: Press <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> anytime to convert all eligible tabs according to your saved preferences.
-* **Preloaded Presets**: Out-of-the-box support for Google Apps (YouTube, YouTube Music, Gmail, Calendar, Chat, Meet, Keep, Drive, Maps, Gemini, AI Studio, Messages) and popular web apps (ChatGPT, Claude, WhatsApp Web, Instagram).
-* **Custom Domain Manager**: Add any custom domain or self-hosted service (e.g. Home Assistant, internal dashboards, GitHub).
 
 ---
 

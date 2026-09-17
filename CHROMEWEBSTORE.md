@@ -29,7 +29,7 @@ Key Highlights & Architecture:
 - Selective Checklist: Check or uncheck individual tabs with "Select All" / "Deselect All" controls before triggering the move.
 - Real-Time Progress Bar: Provides live visual feedback ("Opening tab 3 of 15...") during batch operations.
 - Global Shortcut: Press Alt + Shift + P anytime to pop out all matching tabs instantly.
-- Built-in Google & Web Presets: Out-of-the-box support for YouTube, YouTube Music, Gmail, Google Calendar, Google Chat, Meet, Keep, Drive, Maps, Gemini, Google AI Studio, Google Messages, ChatGPT, Claude, WhatsApp Web, and Instagram.
+- Dynamic PWA Discovery: Automatically detects installed desktop Progressive Web Apps (YouTube, Gmail, Slack, etc.) directly from your OS and Chromium's web app registry with zero static catalogs or hardcoded lists.
 - Custom Domain Manager: Easily add any self-hosted service, intranet tool, or web application domain.
 
 How to use it:
@@ -128,6 +128,7 @@ User settings and preferences (Window Mode, Scope, custom domains) are persisted
 
 | Version | Date | Changes | Status |
 |---|---|---|---|
+| **1.5.0** | 2026-09-17 | Eliminated static app catalog in favor of pure dynamic PWA discovery, added selective PWA disabling (`disabledInstalledAppIds`), decomposed popup code into modular ES components, optimized native messaging host with detached process launch, and broadened cross-browser support (Chrome, Brave, Edge, Vivaldi, Opera, KDE, Hyprland). | Draft |
 | **1.4.0** | 2026-09-16 | Added native PWA launching via `chrome.management.launchApp()` for OS taskbar integration, fixed window query filter to include `type: 'app'`, and enabled precise multi-tab targeting. | Draft |
 | **1.3.0** | 2026-09-16 | Added smart app window reuse (focusing existing PWA instances), dynamic version display in popup footer, and DevTools startup diagnostics. | Draft |
 | **1.2.0** | 2026-09-16 | Added context menus, dynamic badge counter, pinned tab protection, modular `utils/matcher.js`, automated unit & security tests, GitHub Actions CI/release automation. | Internal |

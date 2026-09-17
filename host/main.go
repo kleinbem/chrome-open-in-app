@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -14,7 +13,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type Request struct {
@@ -67,9 +65,15 @@ func logFile() string {
 }
 
 func logDebug(format string, a ...interface{}) {
+	if os.Getenv("OPEN_IN_APP_DEBUG") != "1" {
+		return
+	}
 	lf := logFile()
 	if lf == "" {
 		return
+	}
+	if fi, err := os.Stat(lf); err == nil && fi.Size() > 1024*1024 {
+		_ = os.Truncate(lf, 0)
 	}
 	f, err := os.OpenFile(lf, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -168,42 +172,6 @@ func detectChromeContext() (string, string) {
 	}
 
 	return userDataDir, profileDir
-}
-
-type pwaMapping struct {
-	keyword string
-	domain  string
-}
-
-var knownPwaNames = []pwaMapping{
-	{"youtube music", "music.youtube.com"},
-	{"youtube", "youtube.com"},
-	{"gemini", "gemini.google.com"},
-	{"chatgpt", "chatgpt.com"},
-	{"claude", "claude.ai"},
-	{"deepseek", "chat.deepseek.com"},
-	{"gmail", "mail.google.com"},
-	{"calendar", "calendar.google.com"},
-	{"whatsapp", "web.whatsapp.com"},
-	{"ai studio", "aistudio.google.com"},
-	{"cloud shell", "shell.cloud.google.com"},
-	{"instagram", "instagram.com"},
-	{"kindle", "read.amazon.com"},
-	{"amazon", "amazon.co.uk"},
-	{"slack", "app.slack.com"},
-	{"discord", "discord.com"},
-	{"spotify", "open.spotify.com"},
-	{"notion", "notion.so"},
-	{"github", "github.com"},
-	{"figma", "figma.com"},
-	{"zee5", "zee5.com"},
-	{"dunnes", "dunnesstoresgrocery.com"},
-	{"firebase", "studio.firebase.google.com"},
-	{"messages", "messages.google.com"},
-	{"meet", "meet.google.com"},
-	{"drive", "drive.google.com"},
-	{"keep", "keep.google.com"},
-	{"maps", "maps.google.com"},
 }
 
 // loadPreferencesInstallURLs attempts to extract web_app.app_id.install_url from Chrome Preferences
@@ -352,18 +320,6 @@ func listInstalledPWAs() []PWAInfo {
 			}
 		}
 
-		// 4. Fallback: map by known application names
-		cleanName := strings.ToLower(name)
-		for _, m := range knownPwaNames {
-			if strings.Contains(cleanName, m.keyword) {
-				if !domainSet[m.domain] {
-					domainSet[m.domain] = true
-					domains = append(domains, m.domain)
-				}
-				break
-			}
-		}
-
 		seenIDs[appID] = true
 		apps = append(apps, PWAInfo{
 			ID:             appID,
@@ -392,22 +348,6 @@ func findInstalledPWA(targetURL string) (string, string) {
 	for _, app := range apps {
 		for _, d := range app.Domains {
 			if targetHost == d || strings.HasSuffix(targetHost, "."+d) {
-				return app.ID, app.Name
-			}
-		}
-	}
-
-	// Exact domain match based on known PWA naming heuristics without ambiguous substrings
-	domainPrefix := strings.TrimPrefix(targetHost, "www.")
-	if idx := strings.Index(domainPrefix, "."); idx != -1 {
-		domainPrefix = domainPrefix[:idx]
-	}
-	// Avoid short or common ambiguous tokens (like "app", "web", "api", "mail")
-	ambiguous := map[string]bool{"app": true, "web": true, "api": true, "auth": true, "my": true, "dashboard": true}
-	if len(domainPrefix) >= 4 && !ambiguous[domainPrefix] {
-		for _, app := range apps {
-			cleanName := strings.ToLower(strings.ReplaceAll(app.Name, " ", ""))
-			if strings.Contains(cleanName, domainPrefix) {
 				return app.ID, app.Name
 			}
 		}
@@ -560,12 +500,17 @@ func main() {
 
 	logDebug("Executing: %s %s", chromeBin, strings.Join(args, " "))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, chromeBin, args...)
-	out, err := cmd.CombinedOutput()
-	logDebug("Process executed. Result: %s (err: %v)", strings.TrimSpace(string(out)), err)
+	cmd := exec.Command(chromeBin, args...)
+	if err := cmd.Start(); err != nil {
+		logDebug("Failed to start process: %v", err)
+		_ = sendMessage(writer, Response{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+	_ = cmd.Process.Release()
+	logDebug("Process successfully started in background")
 
 	_ = sendMessage(writer, Response{
 		Success:  true,

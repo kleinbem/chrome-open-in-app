@@ -104,16 +104,39 @@ chrome.action.onClicked.addListener(async () => {
 
 let cachedInstalledPWAs = [];
 let lastPwaFetchTime = 0;
+const PWA_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 /**
- * Query native host for installed PWAs with in-memory caching
+ * Query native host for installed PWAs with persistent storage caching
  */
 async function getInstalledPWAs(forceRefresh = false) {
   const now = Date.now();
-  if (!forceRefresh && cachedInstalledPWAs.length > 0 && (now - lastPwaFetchTime < 5 * 60 * 1000)) {
+
+  // 1. Fast path: in-memory cache if worker remained awake
+  if (!forceRefresh && cachedInstalledPWAs.length > 0 && (now - lastPwaFetchTime < PWA_CACHE_TTL_MS)) {
     return cachedInstalledPWAs;
   }
 
+  // 2. Check persistent chrome.storage.local before spawning native process
+  if (!forceRefresh) {
+    try {
+      const stored = await chrome.storage.local.get(['cachedInstalledPWAs', 'lastPwaFetchTime']);
+      if (
+        Array.isArray(stored.cachedInstalledPWAs) &&
+        stored.cachedInstalledPWAs.length > 0 &&
+        stored.lastPwaFetchTime &&
+        (now - stored.lastPwaFetchTime < PWA_CACHE_TTL_MS)
+      ) {
+        cachedInstalledPWAs = stored.cachedInstalledPWAs;
+        lastPwaFetchTime = stored.lastPwaFetchTime;
+        return cachedInstalledPWAs;
+      }
+    } catch {
+      // Fall through to query if storage read fails
+    }
+  }
+
+  // 3. Query native messaging host
   if (typeof chrome.runtime?.sendNativeMessage === 'function') {
     try {
       const res = await new Promise((resolve) => {
@@ -133,6 +156,9 @@ async function getInstalledPWAs(forceRefresh = false) {
       if (res?.success && Array.isArray(res.apps)) {
         cachedInstalledPWAs = res.apps;
         lastPwaFetchTime = now;
+        try {
+          await chrome.storage.local.set({ cachedInstalledPWAs, lastPwaFetchTime });
+        } catch {}
         console.log(`[Open in App] Dynamically cached ${cachedInstalledPWAs.length} installed PWAs from host`);
         return cachedInstalledPWAs;
       }
@@ -141,7 +167,7 @@ async function getInstalledPWAs(forceRefresh = false) {
     }
   }
 
-  // Fallback to chrome.management.getAll() if native host is unavailable
+  // 4. Fallback to chrome.management.getAll() if native host is unavailable
   if (typeof chrome.management?.getAll === 'function') {
     try {
       const allExtensions = await chrome.management.getAll();
@@ -151,6 +177,9 @@ async function getInstalledPWAs(forceRefresh = false) {
       if (apps.length > 0) {
         cachedInstalledPWAs = apps;
         lastPwaFetchTime = now;
+        try {
+          await chrome.storage.local.set({ cachedInstalledPWAs, lastPwaFetchTime });
+        } catch {}
       }
     } catch {}
   }
