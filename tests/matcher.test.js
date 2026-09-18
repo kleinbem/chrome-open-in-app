@@ -4,6 +4,7 @@ import {
   normalizeDomain,
   getActiveDomains,
   urlMatchesApp,
+  matchDomainOrSubdomain,
   filterEligibleTabs,
   findExistingAppWindow,
   findMatchingInstalledApp,
@@ -82,6 +83,17 @@ describe('URL Matching', () => {
     assert.strictEqual(urlMatchesApp('https://music.youtube.com/', activeDomains), true);
     assert.strictEqual(urlMatchesApp('https://mail.google.com/mail/u/0/#inbox', activeDomains), true);
     assert.strictEqual(urlMatchesApp('https://chatgpt.com/c/12345', activeDomains), true);
+  });
+
+  test('matches domains with or without www prefix interchangeably', () => {
+    assert.strictEqual(urlMatchesApp('https://amazon.ie/dp/12345', ['www.amazon.ie']), true);
+    assert.strictEqual(urlMatchesApp('https://www.amazon.ie/dp/12345', ['amazon.ie']), true);
+    assert.strictEqual(urlMatchesApp('https://smile.amazon.ie/dp/12345', ['www.amazon.ie']), true);
+    assert.strictEqual(urlMatchesApp('https://fake-amazon.ie/dp/12345', ['www.amazon.ie']), false);
+    assert.strictEqual(matchDomainOrSubdomain('amazon.ie', 'www.amazon.ie'), true);
+    assert.strictEqual(matchDomainOrSubdomain('www.amazon.ie', 'amazon.ie'), true);
+    assert.strictEqual(matchDomainOrSubdomain('smile.amazon.ie', 'www.amazon.ie'), true);
+    assert.strictEqual(matchDomainOrSubdomain('other.com', 'www.amazon.ie'), false);
   });
 
   test('rejects unrelated domains and domain spoofing / suffix tricks', () => {
@@ -418,6 +430,20 @@ describe('Tab Grouping by App', () => {
     // Other groups have 1 tab each
     const names = groups.slice(1).map((g) => g.name).sort();
     assert.deepStrictEqual(names, ['ChatGPT', 'Claude', 'Slack']);
+  });
+
+  test('groups tabs with or without www under installed PWA', () => {
+    const tabs = [
+      { id: 10, url: 'https://amazon.ie/dp/item1', title: 'Amazon Item 1' },
+      { id: 11, url: 'https://www.amazon.ie/dp/item2', title: 'Amazon Item 2' }
+    ];
+    const installed = [
+      { id: 'ndccmjlnaibhkkpkjlkhegjliobijdhg', name: 'Amazon IE', domains: ['www.amazon.ie', 'amazon.ie'] }
+    ];
+    const groups = groupTabsByApp(tabs, ['amazon.ie', 'www.amazon.ie'], [], installed);
+    assert.strictEqual(groups.length, 1);
+    assert.strictEqual(groups[0].name, 'Amazon IE');
+    assert.strictEqual(groups[0].tabs.length, 2);
   });
 
   test('handles custom domains without preset metadata', () => {

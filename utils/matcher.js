@@ -112,6 +112,12 @@ export function getActiveDomains(presets = [], customDomains = [], installedApps
             if (normalized && !active.includes(normalized)) {
               active.push(normalized);
             }
+            if (normalized && normalized.startsWith('www.')) {
+              const root = normalized.slice(4);
+              if (root && !active.includes(root)) {
+                active.push(root);
+              }
+            }
           }
         }
       }
@@ -119,6 +125,22 @@ export function getActiveDomains(presets = [], customDomains = [], installedApps
   }
 
   return active;
+}
+
+/**
+ * Check if a hostname matches a target domain or is a subdomain of it,
+ * handling optional www. prefixes interchangeably.
+ */
+export function matchDomainOrSubdomain(hostname, targetDomain) {
+  if (!hostname || !targetDomain || typeof hostname !== 'string' || typeof targetDomain !== 'string') {
+    return false;
+  }
+  const h = hostname.toLowerCase().trim();
+  const t = targetDomain.toLowerCase().trim();
+  if (h === t || h.endsWith('.' + t)) return true;
+  const hNoWww = h.replace(/^www\./, '');
+  const tNoWww = t.replace(/^www\./, '');
+  return hNoWww === tNoWww || hNoWww.endsWith('.' + tNoWww);
 }
 
 /**
@@ -140,10 +162,7 @@ export function urlMatchesApp(urlStr, activeDomains = []) {
     }
     const hostname = parsed.hostname.toLowerCase();
 
-    const directMatch = activeDomains.some((d) => {
-      const clean = d.toLowerCase().trim();
-      return hostname === clean || hostname.endsWith('.' + clean);
-    });
+    const directMatch = activeDomains.some((d) => matchDomainOrSubdomain(hostname, d));
     if (directMatch) return true;
 
     // Handle Google Captcha/Sorry redirect pages that are waiting to return to an active app
@@ -153,10 +172,7 @@ export function urlMatchesApp(urlStr, activeDomains = []) {
         try {
           const continueUrl = new URL(continueParam);
           const continueHost = continueUrl.hostname.toLowerCase();
-          return activeDomains.some((d) => {
-            const clean = d.toLowerCase().trim();
-            return continueHost === clean || continueHost.endsWith('.' + clean);
-          });
+          return activeDomains.some((d) => matchDomainOrSubdomain(continueHost, d));
         } catch {}
       }
     }
@@ -224,10 +240,7 @@ export function findExistingAppWindow(urlStr, allWindows = [], activeDomains = [
   try {
     const parsed = new URL(urlStr);
     const hostname = parsed.hostname.toLowerCase();
-    matchedDomain = activeDomains.find((d) => {
-      const clean = d.toLowerCase().trim();
-      return hostname === clean || hostname.endsWith('.' + clean);
-    });
+    matchedDomain = activeDomains.find((d) => matchDomainOrSubdomain(hostname, d));
   } catch {
     return null;
   }
@@ -339,8 +352,7 @@ export function findMatchingInstalledApp(urlStr, installedApps = []) {
     if (Array.isArray(app.domains)) {
       for (const d of app.domains) {
         if (typeof d === 'string' && d) {
-          const cleanDom = d.toLowerCase().trim();
-          if (targetHostname === cleanDom || targetHostname.endsWith('.' + cleanDom)) {
+          if (matchDomainOrSubdomain(targetHostname, d)) {
             return app;
           }
         }
@@ -353,7 +365,7 @@ export function findMatchingInstalledApp(urlStr, installedApps = []) {
         const appUrl = new URL(app.appLaunchUrl);
         const appHost = appUrl.hostname.toLowerCase();
         if (appHost && !DANGEROUS_KEYS.has(appHost)) {
-          if (targetHostname === appHost || targetHostname.endsWith('.' + appHost) || appHost.endsWith('.' + targetHostname)) {
+          if (matchDomainOrSubdomain(targetHostname, appHost) || matchDomainOrSubdomain(appHost, targetHostname)) {
             return app;
           }
         }
@@ -403,7 +415,7 @@ export function groupTabsByApp(tabs = [], activeDomains = [], presets = [], inst
     if (Array.isArray(installedApps)) {
       matchedInstalledApp = installedApps.find((app) => {
         if (!app || !Array.isArray(app.domains)) return false;
-        return app.domains.some((d) => host === d || host.endsWith('.' + d));
+        return app.domains.some((d) => matchDomainOrSubdomain(host, d));
       });
     }
 
@@ -411,8 +423,7 @@ export function groupTabsByApp(tabs = [], activeDomains = [], presets = [], inst
     const matchedPreset = Array.isArray(presets)
       ? presets.find((p) => {
           if (!p || !p.domain) return false;
-          const cleanPresetDomain = p.domain.toLowerCase().trim();
-          return host === cleanPresetDomain || host.endsWith('.' + cleanPresetDomain);
+          return matchDomainOrSubdomain(host, p.domain);
         })
       : null;
 
@@ -430,7 +441,7 @@ export function groupTabsByApp(tabs = [], activeDomains = [], presets = [], inst
       groupDomain = matchedPreset.domain;
     } else {
       const matchedDomain = Array.isArray(activeDomains)
-        ? activeDomains.find((d) => host === d || host.endsWith('.' + d))
+        ? activeDomains.find((d) => matchDomainOrSubdomain(host, d))
         : null;
 
       groupKey = matchedDomain || host;

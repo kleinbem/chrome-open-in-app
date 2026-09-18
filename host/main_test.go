@@ -62,4 +62,21 @@ func TestFindInstalledPWA(t *testing.T) {
 			t.Errorf("Expected name 'Google Gemini', got %s", pwa.Name)
 		}
 	}
+
+	amazonPWA := findInstalledPWA("https://www.amazon.ie/dp/B09YTX4QPZ")
+	if amazonPWA != nil {
+		if amazonPWA.ID != "ndccmjlnaibhkkpkjlkhegjliobijdhg" {
+			t.Errorf("Expected Amazon IE ID ndccmjlnaibhkkpkjlkhegjliobijdhg, got %s", amazonPWA.ID)
+		}
+		if amazonPWA.Name != "Amazon IE" {
+			t.Errorf("Expected name 'Amazon IE', got %s", amazonPWA.Name)
+		}
+	}
+
+	amazonPWANoWWW := findInstalledPWA("https://amazon.ie/dp/B09YTX4QPZ")
+	if amazonPWANoWWW != nil {
+		if amazonPWANoWWW.ID != "ndccmjlnaibhkkpkjlkhegjliobijdhg" {
+			t.Errorf("Expected Amazon IE ID ndccmjlnaibhkkpkjlkhegjliobijdhg, got %s", amazonPWANoWWW.ID)
+		}
+	}
 }

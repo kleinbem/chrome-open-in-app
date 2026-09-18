@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/json"
@@ -56,7 +57,7 @@ var (
 	userDataRegex = regexp.MustCompile(`--user-data-dir=([^ \x00\t\r\n"']+)`)
 	profileRegex  = regexp.MustCompile(`--profile-directory=([^ \x00\t\r\n"']+)`)
 	leveldbAppRe  = regexp.MustCompile(`web_apps-dt-([a-p0-9]{32})`)
-	leveldbURLRe  = regexp.MustCompile(`https?://[a-zA-Z0-9\.\-_]+(/[^\x00-\x1f\x7f-\xff]*)?`)
+	leveldbURLRe  = regexp.MustCompile(`https?://[a-zA-Z0-9\.\-_]+(/[^\s"'\x00-\x1f\x7f-\xff<>]*)?`)
 )
 
 func logFile() string {
@@ -193,7 +194,33 @@ func generateAppID(manifestIDOrURL string) string {
 	return sb.String()
 }
 
-// loadPWAAppIdToDomains dynamically extracts app ID -> domain mappings from browser Preferences and Sync LevelDB
+// testURLAppIDMatch mathematically verifies if rawURL (or its origin / path root) derives targetAid
+func testURLAppIDMatch(rawURL, targetAid string) bool {
+	if rawURL == "" || targetAid == "" {
+		return false
+	}
+	if generateAppID(rawURL) == targetAid {
+		return true
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Hostname() == "" {
+		return false
+	}
+	if generateAppID(fmt.Sprintf("%s://%s/", u.Scheme, u.Hostname())) == targetAid {
+		return true
+	}
+	if generateAppID(fmt.Sprintf("%s://%s", u.Scheme, u.Hostname())) == targetAid {
+		return true
+	}
+	if u.Path != "" && u.Path != "/" {
+		if generateAppID(fmt.Sprintf("%s://%s%s", u.Scheme, u.Hostname(), u.Path)) == targetAid {
+			return true
+		}
+	}
+	return false
+}
+
+// loadPWAAppIdToDomains dynamically extracts app ID -> domain mappings from browser Preferences, Sync LevelDB, and History
 func loadPWAAppIdToDomains(desktopFiles []string) map[string][]string {
 	appMap := make(map[string]map[string]bool)
 	addDomain := func(appID, rawURL string) {
@@ -202,10 +229,25 @@ func loadPWAAppIdToDomains(desktopFiles []string) map[string][]string {
 		}
 		if u, err := url.Parse(rawURL); err == nil && u.Hostname() != "" {
 			host := strings.ToLower(u.Hostname())
+			if strings.Contains(host, "clients2.google.com") || strings.Contains(host, "gstatic.com") {
+				return
+			}
 			if appMap[appID] == nil {
 				appMap[appID] = make(map[string]bool)
 			}
 			appMap[appID][host] = true
+			if strings.HasPrefix(host, "www.") {
+				appMap[appID][strings.TrimPrefix(host, "www.")] = true
+			}
+		}
+	}
+
+	installedAppIDs := make(map[string]bool)
+	for _, df := range desktopFiles {
+		if c, err := os.ReadFile(df); err == nil {
+			if m := appIDRegex.FindStringSubmatch(string(c)); len(m) > 1 {
+				installedAppIDs[m[1]] = true
+			}
 		}
 	}
 
@@ -284,17 +326,81 @@ func loadPWAAppIdToDomains(desktopFiles []string) map[string][]string {
 			if err != nil || len(content) == 0 {
 				continue
 			}
+
+			// 2A. Scan with web_apps-dt- prefix
 			matches := leveldbAppRe.FindAllSubmatchIndex(content, -1)
 			for _, loc := range matches {
 				if len(loc) >= 4 {
 					aid := string(content[loc[2]:loc[3]])
-					endIdx := loc[1] + 300
+					endIdx := loc[1] + 400
 					if endIdx > len(content) {
 						endIdx = len(content)
 					}
 					sub := content[loc[1]:endIdx]
 					if urlMatch := leveldbURLRe.Find(sub); urlMatch != nil {
 						addDomain(aid, string(urlMatch))
+					}
+				}
+			}
+
+			// 2B. Direct scan for known installed app IDs (which may not have web_apps-dt- prefix in sync records)
+			for aid := range installedAppIDs {
+				baid := []byte(aid)
+				pos := 0
+				for {
+					idx := bytes.Index(content[pos:], baid)
+					if idx == -1 {
+						break
+					}
+					matchIdx := pos + idx
+					endIdx := matchIdx + len(baid) + 250
+					if endIdx > len(content) {
+						endIdx = len(content)
+					}
+					window := content[matchIdx:endIdx]
+					if cutoff := bytes.Index(window, []byte("sessions-dt-")); cutoff != -1 {
+						window = window[:cutoff]
+					}
+					if cutoff2 := bytes.Index(window, []byte("bookmarks-dt-")); cutoff2 != -1 {
+						window = window[:cutoff2]
+					}
+
+					urlMatches := leveldbURLRe.FindAllIndex(window, -1)
+					for _, loc := range urlMatches {
+						rawU := string(window[loc[0]:loc[1]])
+						if testURLAppIDMatch(rawU, aid) || (loc[0] < 60 && len(appMap[aid]) == 0) {
+							addDomain(aid, rawU)
+						}
+					}
+					pos = matchIdx + len(baid)
+				}
+			}
+		}
+
+		// 3. Scan History database files for any installed apps still missing domains
+		missingIDs := make(map[string]bool)
+		for aid := range installedAppIDs {
+			if len(appMap[aid]) == 0 {
+				missingIDs[aid] = true
+			}
+		}
+		if len(missingIDs) > 0 {
+			historyFiles, _ := filepath.Glob(filepath.Join(baseDir, "*", "History"))
+			for _, hf := range historyFiles {
+				if hdata, err := os.ReadFile(hf); err == nil && len(hdata) > 0 {
+					urls := leveldbURLRe.FindAll(hdata, -1)
+					for _, uBytes := range urls {
+						rawU := string(uBytes)
+						if strings.Count(rawU, "/") <= 5 {
+							calcID := generateAppID(rawU)
+							if missingIDs[calcID] {
+								addDomain(calcID, rawU)
+								delete(missingIDs, calcID)
+								if len(missingIDs) == 0 {
+									break
+								}
+							}
+						}
 					}
 				}
 			}
