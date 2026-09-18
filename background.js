@@ -357,6 +357,13 @@ async function moveOrReuseTab(tab, windowMode = 'popup', reuseExisting = true, i
           newAppWin = currentWins.find(
             (w) => !beforeWinIds.has(w.id) && (w.type === 'app' || w.type === 'popup')
           );
+          if (!newAppWin) {
+            // Check if tab was opened/focused in an existing app window matching this URL
+            newAppWin = currentWins.find(
+              (w) => (w.type === 'app' || w.type === 'popup') &&
+                     w.tabs?.some((t) => t.url === tab.url || t.pendingUrl === tab.url)
+            );
+          }
           if (newAppWin) break;
         }
 
@@ -370,6 +377,10 @@ async function moveOrReuseTab(tab, windowMode = 'popup', reuseExisting = true, i
             }
           }
           await chrome.windows.update(newAppWin.id, { focused: isFocused });
+          await chrome.tabs.remove(tab.id).catch(() => {});
+          return true;
+        } else if (nativeRes?.isPwa) {
+          console.log(`[Open in App] Native PWA launch confirmed for ${tab.url}`);
           await chrome.tabs.remove(tab.id).catch(() => {});
           return true;
         } else {

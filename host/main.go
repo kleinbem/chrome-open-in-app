@@ -586,9 +586,6 @@ func main() {
 	}
 
 	if matchedApp != nil {
-		if userDir == "" && matchedApp.UserDataDir != "" {
-			userDir = matchedApp.UserDataDir
-		}
 		if profDir == "" && matchedApp.ProfileDir != "" {
 			profDir = matchedApp.ProfileDir
 		}
@@ -605,6 +602,9 @@ func main() {
 
 	if appID != "" {
 		args = append(args, "--new-window", fmt.Sprintf("--app-id=%s", appID))
+		if req.URL != "" {
+			args = append(args, fmt.Sprintf("--app-launch-url-for-shortcuts-menu-item=%s", req.URL))
+		}
 	} else if req.URL != "" {
 		args = append(args, fmt.Sprintf("--app=%s", req.URL))
 	}
