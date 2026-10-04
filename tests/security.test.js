@@ -62,8 +62,15 @@ describe('Security: Strict Protocol Enforcement & Execution Vectors', () => {
 describe('Security: Static Code Audit (Forbidden Dangerous Sinks)', () => {
   const jsFiles = [
     'background.js',
+    'background/badge.js',
+    'background/tab-query.js',
+    'background/tab-mover.js',
     'popup/popup.js',
-    'utils/matcher.js'
+    'popup/dom.js',
+    'popup/tab-list.js',
+    'popup/settings-view.js',
+    'utils/matcher.js',
+    'utils/window-matcher.js'
   ];
 
   test('zero usage of eval() or new Function()', () => {

@@ -80,3 +80,64 @@ func TestFindInstalledPWA(t *testing.T) {
 		}
 	}
 }
+
+func TestExtractDisplayMode(t *testing.T) {
+	tests := []struct {
+		name     string
+		chunk    []byte
+		expected int
+	}{
+		{
+			name:     "WebAppSpecifics user_display_mode BROWSER (tag 0x18 val 1)",
+			chunk:    []byte("https://drive.google.com/\x12\x05Drive\x18\x01\x20\x00"),
+			expected: 1,
+		},
+		{
+			name:     "WebAppSpecifics user_display_mode STANDALONE (tag 0x18 val 3)",
+			chunk:    []byte("https://youtube.com/\x12\x07YouTube\x18\x03\x20\x00"),
+			expected: 3,
+		},
+		{
+			name:     "WebAppProto display_mode BROWSER (tag 0x28 val 1)",
+			chunk:    []byte("https://mail.google.com/\x12\x05Gmail\x28\x01\x30\x00"),
+			expected: 1,
+		},
+		{
+			name:     "WebAppProto display_mode TABBED (tag 0x28 val 6)",
+			chunk:    []byte("https://chatgpt.com/\x12\x07ChatGPT\x28\x06\x30\x00"),
+			expected: 6,
+		},
+		{
+			name:     "No http url in chunk",
+			chunk:    []byte("some_internal_data\x18\x01"),
+			expected: 0,
+		},
+		{
+			name:     "Empty chunk",
+			chunk:    []byte{},
+			expected: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		actual := extractDisplayMode(tt.chunk)
+		if actual != tt.expected {
+			t.Errorf("%s: extractDisplayMode() = %d, expected %d", tt.name, actual, tt.expected)
+		}
+	}
+}
+
+func TestListInstalledPWAsFiltersTabApps(t *testing.T) {
+	apps := listInstalledPWAs()
+	for _, app := range apps {
+		if !app.OpenInWindow {
+			t.Errorf("App %s (%s) returned with OpenInWindow=false; all discovered apps must have OpenInWindow=true", app.Name, app.ID)
+		}
+		if app.ID == "aghbiahbpaijignceidepookljebhfak" {
+			t.Errorf("Google Drive (%s) should have been filtered out because 'open in Window' is disabled", app.ID)
+		}
+		if app.ID == "fmgjjmmmlfnkbppncabfkddbjimcfncm" {
+			t.Errorf("Gmail (%s) should have been filtered out because 'open in Window' is disabled", app.ID)
+		}
+	}
+}

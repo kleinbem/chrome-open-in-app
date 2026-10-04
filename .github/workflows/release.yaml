@@ -39,18 +39,8 @@ jobs:
 
       - name: Create Production Zip for Chrome Web Store
         run: |
-          ZIP_NAME="open-in-app-v${{ steps.get_version.outputs.VERSION }}.zip"
-          
-          # Package strictly the runtime files required by Chrome Web Store
-          # Excludes: .git, tests, node_modules, config files, and dev docs
-          zip -r "$ZIP_NAME" \
-            manifest.json \
-            background.js \
-            popup \
-            icons \
-            utils \
-            -x "*.DS_Store" "*__tests__*"
-
+          npm run package
+          ZIP_NAME="dist/open-in-app-v${{ steps.get_version.outputs.VERSION }}.zip"
           echo "Package created successfully: $ZIP_NAME"
           ls -lh "$ZIP_NAME"
 
@@ -58,13 +48,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: open-in-app-v${{ steps.get_version.outputs.VERSION }}
-          path: open-in-app-v${{ steps.get_version.outputs.VERSION }}.zip
+          path: dist/open-in-app-v${{ steps.get_version.outputs.VERSION }}.zip
           retention-days: 90
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: open-in-app-v${{ steps.get_version.outputs.VERSION }}.zip
+          files: dist/open-in-app-v${{ steps.get_version.outputs.VERSION }}.zip
           name: Release v${{ steps.get_version.outputs.VERSION }}
           generate_release_notes: true

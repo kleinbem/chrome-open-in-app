@@ -1,12 +1,12 @@
 {
   "name": "chrome-open-in-app",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Chrome Extension to batch move open tabs into standalone app windows",
   "type": "module",
   "scripts": {
     "test": "node --test 'tests/**/*.test.js'",
     "lint": "eslint .",
-    "check": "node --check background.js popup/popup.js popup/dom.js popup/tab-list.js popup/settings-view.js utils/matcher.js",
+    "check": "node --check background.js background/badge.js background/tab-query.js background/tab-mover.js popup/popup.js popup/dom.js popup/tab-list.js popup/settings-view.js utils/matcher.js utils/window-matcher.js",
     "validate": "npm run check && npm run lint && npm test",
     "package": "python3 scripts/package.py"
   },

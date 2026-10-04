@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Open in App - Move Tabs to App Windows",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Batch move open Google and web tabs into standalone app windows or dedicated windows with full toolbar support.",
   "permissions": [
     "tabs",

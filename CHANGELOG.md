@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.2] — 2026-09-21
+
+### Fixed
+* **Filter Out Chrome Apps Without "Open as Window"**: Chrome allows defining web apps and desktop shortcuts with or without the "Open as window" setting (`user_display_mode: BROWSER` vs `STANDALONE`/`TABBED`). Launching `--app-id` on apps created without "Open as window" causes Chromium to open them inside a regular browser tab rather than an app window. The native host now inspects Chromium's `user_display_mode` metadata in LevelDB records and filters out tab-only shortcuts, ensuring only genuine standalone windowed PWAs are offered for app detachment.
+* **Open-in-Window Property Propagation**: Surface `openInWindow: true` on discovered `PWAInfo` objects and add defensive validation across `getActiveDomains()`, `findMatchingInstalledApp()`, and `groupTabsByApp()`.
+
+---
+
 ## [1.5.1] — 2026-09-17
 
 ### Fixed

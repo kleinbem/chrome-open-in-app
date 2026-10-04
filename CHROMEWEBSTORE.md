@@ -128,6 +128,8 @@ User settings and preferences (Window Mode, Scope, custom domains) are persisted
 
 | Version | Date | Changes | Status |
 |---|---|---|---|
+| **1.5.2** | 2026-09-21 | Filter out Chrome web apps/shortcuts defined without "Open as window" (`user_display_mode: BROWSER`) by parsing Chromium LevelDB metadata, preventing tab shortcuts from being launched into browser tabs. Added openInWindow safety guards across domain and tab matching engines. | Draft |
+| **1.5.1** | 2026-09-17 | Resolved PWA domain matching for shortcut-less PWAs (Gemini, Claude, ChatGPT), implemented Chromium double-SHA256 App ID derivation in Go, and added multi-profile LevelDB discovery. | Draft |
 | **1.5.0** | 2026-09-17 | Eliminated static app catalog in favor of pure dynamic PWA discovery, added selective PWA disabling (`disabledInstalledAppIds`), decomposed popup code into modular ES components, optimized native messaging host with detached process launch, and broadened cross-browser support (Chrome, Brave, Edge, Vivaldi, Opera, KDE, Hyprland). | Draft |
 | **1.4.0** | 2026-09-16 | Added native PWA launching via `chrome.management.launchApp()` for OS taskbar integration, fixed window query filter to include `type: 'app'`, and enabled precise multi-tab targeting. | Draft |
 | **1.3.0** | 2026-09-16 | Added smart app window reuse (focusing existing PWA instances), dynamic version display in popup footer, and DevTools startup diagnostics. | Draft |

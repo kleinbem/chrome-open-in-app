@@ -386,6 +386,36 @@ describe('Installed PWA Detection & Launch Matching', () => {
     assert.ok(!active.includes('disabled.internal.app'));
   });
 
+  test('ignores installed apps where openInWindow is false', () => {
+    const appsWithWindowFlags = [
+      {
+        id: 'fmgjjmmmlfnkbppncabfkddbjimcfncm',
+        name: 'Gmail (Tab Shortcut)',
+        domains: ['mail.google.com'],
+        openInWindow: false,
+        enabled: true
+      },
+      {
+        id: 'agimnkijcaahngcdmfeangaknmldooml',
+        name: 'YouTube',
+        domains: ['youtube.com'],
+        openInWindow: true,
+        enabled: true
+      }
+    ];
+
+    // findMatchingInstalledApp ignores openInWindow: false
+    assert.strictEqual(findMatchingInstalledApp('https://mail.google.com/mail/u/0/', appsWithWindowFlags), null);
+    const yt = findMatchingInstalledApp('https://youtube.com/watch?v=1', appsWithWindowFlags);
+    assert.ok(yt);
+    assert.strictEqual(yt.id, 'agimnkijcaahngcdmfeangaknmldooml');
+
+    // getActiveDomains filters out openInWindow: false
+    const active = getActiveDomains([], [], appsWithWindowFlags, []);
+    assert.ok(active.includes('youtube.com'));
+    assert.ok(!active.includes('mail.google.com'));
+  });
+
   test('returns null when no installed app matches URL', () => {
     const match = findMatchingInstalledApp('https://news.ycombinator.com', mockInstalledApps);
     assert.strictEqual(match, null);
