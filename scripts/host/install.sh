@@ -24,7 +24,7 @@ if [ -n "${1:-}" ]; then
 fi
 
 # Deduplicate origins
-UNIQUE_ORIGINS=($(printf "%s\n" "${ORIGINS_SET[@]}" | sort -u))
+mapfile -t UNIQUE_ORIGINS < <(printf "%s\n" "${ORIGINS_SET[@]}" | sort -u)
 ORIGINS_JSON=$(printf '    "%s",\n' "${UNIQUE_ORIGINS[@]}" | sed '$ s/,$//')
 
 echo "Installing Open in App Native Messaging Host (Go binary)..."
