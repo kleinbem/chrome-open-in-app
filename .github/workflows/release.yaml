@@ -24,7 +24,7 @@ jobs:
       # No npm cache: a release build must not restore a cache other runs wrote.
       # setup-node v4 caches only with `cache:` set (package-manager-cache is v5+).
       - name: Setup Node.js 22 # zizmor: ignore[cache-poisoning]
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
 
