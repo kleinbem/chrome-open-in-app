@@ -116,15 +116,6 @@ func main() {
 	profDir := req.ProfileDir
 	appID := req.AppID
 
-	detectedUserDir, detectedProfDir := detectChromeContext()
-	logDebug("Detected context: user_data_dir=%s, profile_dir=%s", detectedUserDir, detectedProfDir)
-	if userDir == "" && detectedUserDir != "" {
-		userDir = detectedUserDir
-	}
-	if profDir == "" && detectedProfDir != "" {
-		profDir = detectedProfDir
-	}
-
 	isPWA := false
 	var matchedApp *PWAInfo
 
@@ -150,10 +141,23 @@ func main() {
 		}
 	}
 
+	// Request first, then the matched app (it may live in another profile),
+	// then the detected context, which always yields a profile.
 	if matchedApp != nil {
-		if profDir == "" && matchedApp.ProfileDir != "" {
+		if userDir == "" {
+			userDir = matchedApp.UserDataDir
+		}
+		if profDir == "" {
 			profDir = matchedApp.ProfileDir
 		}
+	}
+	detectedUserDir, detectedProfDir := detectChromeContext()
+	logDebug("Detected context: user_data_dir=%s, profile_dir=%s", detectedUserDir, detectedProfDir)
+	if userDir == "" {
+		userDir = detectedUserDir
+	}
+	if profDir == "" {
+		profDir = detectedProfDir
 	}
 
 	chromeBin := findChromeBinary()

@@ -350,6 +350,21 @@ describe('Installed PWA Detection & Launch Matching', () => {
     assert.strictEqual(match, null);
   });
 
+  test('a domain match beats an earlier app matched only by name', () => {
+    const apps = [
+      { id: 'mail_by_name', name: 'Mail', type: 'hosted_app' },
+      { id: 'gmail', name: 'Gmail', type: 'hosted_app', appLaunchUrl: 'https://mail.google.com/' }
+    ];
+    assert.strictEqual(findMatchingInstalledApp('https://mail.google.com/mail/u/0/', apps).id, 'gmail');
+  });
+
+  test('name fallback needs a whole host label', () => {
+    const apps = [{ id: 'mail_app', name: 'Mail', type: 'hosted_app' }];
+    assert.strictEqual(findMatchingInstalledApp('https://gmail.com/', apps), null);
+    const spotify = [{ id: 'spotify', name: 'Spotify', type: 'hosted_app' }];
+    assert.strictEqual(findMatchingInstalledApp('https://open.spotify.com/', spotify).id, 'spotify');
+  });
+
   test('matches dynamic OS desktop PWA by domains array', () => {
     const desktopPwas = [
       {

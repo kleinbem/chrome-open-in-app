@@ -36,7 +36,7 @@ mkdir -p "${HOME}/.local/bin"
 
 if command -v go >/dev/null 2>&1 && [ -f "${REPO_ROOT}/host/main.go" ]; then
   echo "Compiling native host from Go source..."
-  (cd "${REPO_ROOT}/host" && go build -ldflags="-s -w" -o "${TARGET_BIN}" main.go)
+  (cd "${REPO_ROOT}/host" && go build -ldflags="-s -w" -o "${TARGET_BIN}" .)
 elif [ -f "${REPO_ROOT}/host/chrome-open-in-app-host" ]; then
   cp "${REPO_ROOT}/host/chrome-open-in-app-host" "${TARGET_BIN}"
 else

@@ -97,7 +97,10 @@ chrome.windows.onFocusChanged.addListener((winId) => {
     scheduleBadgeUpdate(400);
   }
 });
-chrome.storage.onChanged.addListener(() => scheduleBadgeUpdate(300));
+// Only sync holds settings; local is the PWA cache, which the badge update itself writes.
+chrome.storage.onChanged.addListener((_changes, area) => {
+  if (area === 'sync') scheduleBadgeUpdate(300);
+});
 
 // Global keyboard shortcut handler (Alt+Shift+P)
 chrome.commands.onCommand.addListener(async (command) => {

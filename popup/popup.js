@@ -157,21 +157,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       onMoveSingleTab: async (tab, card, popBtn) => {
         popBtn.disabled = true;
         try {
-          await chrome.runtime.sendMessage({
+          const response = await chrome.runtime.sendMessage({
             action: 'MOVE_SINGLE_TAB',
             tabId: tab.id,
             windowMode: currentConfig.windowMode
           });
-          const groupBody = card.closest('.app-group-body');
-          card.remove();
+          if (!response?.success) {
+            throw new Error(response?.error || 'MOVE_SINGLE_TAB failed');
+          }
           selectedTabIds.delete(tab.id);
           currentTabs = currentTabs.filter((t) => t.id !== tab.id);
-
-          if (groupBody && groupBody.children.length === 0) {
-            const groupCard = groupBody.closest('.app-group-card');
-            if (groupCard) groupCard.remove();
-          }
-
+          // Re-render so the count, empty groups and the empty state follow.
+          triggerRenderTabList();
           syncSelectionUI();
           setStatus(statusMessage, 'Opened in app window');
         } catch (err) {
@@ -258,8 +255,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       groupCards.forEach((c) => c.classList.add('collapsed'));
       const activeGroups = tabsList.querySelectorAll('.app-group-card');
       activeGroups.forEach((card) => {
-        const title = card.querySelector('.app-group-title')?.textContent;
-        if (title) collapsedGroups.add(title);
+        const key = card.dataset.groupKey;
+        if (key) collapsedGroups.add(key);
       });
       expandBtnText.textContent = 'Expand All';
     } else {
@@ -357,6 +354,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       setStatus(statusMessage, `Successfully opened ${count} of ${tabIdsToMove.length} tabs in app!`);
       await refreshTabs();
+      btnRefresh.disabled = false;
     } catch (err) {
       console.error('Error in batch open:', err);
       progressContainer.classList.remove('active');

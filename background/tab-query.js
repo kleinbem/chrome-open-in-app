@@ -14,7 +14,8 @@ export async function getInstalledPWAs(forceRefresh = false) {
   const now = Date.now();
 
   // 1. Fast path: in-memory cache if worker remained awake
-  if (!forceRefresh && cachedInstalledPWAs.length > 0 && (now - lastPwaFetchTime < PWA_CACHE_TTL_MS)) {
+  // Freshness by fetch time alone: an empty list (no PWAs installed) is a valid result.
+  if (!forceRefresh && lastPwaFetchTime && (now - lastPwaFetchTime < PWA_CACHE_TTL_MS)) {
     return cachedInstalledPWAs;
   }
 
@@ -24,7 +25,6 @@ export async function getInstalledPWAs(forceRefresh = false) {
       const stored = await chrome.storage.local.get(['cachedInstalledPWAs', 'lastPwaFetchTime']);
       if (
         Array.isArray(stored.cachedInstalledPWAs) &&
-        stored.cachedInstalledPWAs.length > 0 &&
         stored.lastPwaFetchTime &&
         (now - stored.lastPwaFetchTime < PWA_CACHE_TTL_MS)
       ) {
