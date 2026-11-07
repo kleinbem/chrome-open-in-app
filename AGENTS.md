@@ -10,11 +10,14 @@ Guidance for AI assistants working in this repository.
 
 | Path | What lives here |
 |---|---|
-| `manifest.json` | Manifest V3 specification with `tabs` and `storage` permissions. |
+| `manifest.json` | Manifest V3 specification: `tabs`, `storage`, `contextMenus`, `management`, `nativeMessaging` permissions. |
 | `background.js` | Service worker handling keyboard commands, throttled window detachment, and messaging. |
-| `popup/` | Popup UI (`popup.html`, `popup.css`, `popup.js`). |
+| `background/` | Service-worker modules: badge, tab query (PWA discovery + cache), tab mover. |
+| `popup/` | Popup UI (`popup.html`, `popup.css`, `popup.js`, `dom.js`, `tab-list.js`, `settings-view.js`). |
 | `icons/` | Application icons (16x16, 48x48, 128x128 PNGs). |
-| `utils/matcher.js` | Core domain normalization, URL pattern matching, and tab filtering logic. |
+| `utils/matcher.js`, `utils/window-matcher.js` | Domain normalization, URL pattern matching, tab filtering, installed-app matching and grouping. |
+| `host/` | Go native messaging host (`com.kleinbem.open_in_app`): lists and launches installed PWAs. |
+| `scripts/` | `package.py` (store zip), `host/install.sh` (installs the native host). |
 | `tests/` | Node 22 native unit and security test suites (`npm test`). |
 | `CHROMEWEBSTORE.md` | Chrome Web Store listing metadata and permissions justifications. |
 
