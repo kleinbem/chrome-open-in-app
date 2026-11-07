@@ -188,6 +188,7 @@ export function createGroupElement(group, {
 }) {
   const card = document.createElement('div');
   card.className = 'app-group-card';
+  card.dataset.groupKey = group.key;
   if (collapsedGroups.has(group.key)) {
     card.classList.add('collapsed');
   }

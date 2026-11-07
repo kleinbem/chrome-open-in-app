@@ -76,6 +76,19 @@ export function renderInstalledPWAs(container, installedApps, disabledAppIds = [
  * @param {Array<string|Object>} customDomains
  * @param {Function} onRemoveDomain
  */
+/**
+ * Render the custom domain list with a remove handler that re-renders with
+ * itself, so every row keeps a working delete button.
+ */
+function renderEditableCustomDomains(container, getConfig, save) {
+  const onRemove = async (index) => {
+    getConfig().customDomains.splice(index, 1);
+    await save({ customDomains: getConfig().customDomains });
+    renderCustomDomains(container, getConfig().customDomains, onRemove);
+  };
+  renderCustomDomains(container, getConfig().customDomains, onRemove);
+}
+
 export function renderCustomDomains(container, customDomains = [], onRemoveDomain) {
   if (!container) return;
   clearElement(container);
@@ -315,15 +328,7 @@ export function bindSettingsEvents({
       if (!exists) {
         getConfig().customDomains.push({ domain: clean, enabled: true });
         await saveConfig({ customDomains: getConfig().customDomains });
-        renderCustomDomains(
-          customDomainsList,
-          getConfig().customDomains,
-          async (index) => {
-            getConfig().customDomains.splice(index, 1);
-            await saveConfig({ customDomains: getConfig().customDomains });
-            renderCustomDomains(customDomainsList, getConfig().customDomains);
-          }
-        );
+        renderEditableCustomDomains(customDomainsList, getConfig, saveConfig);
         inputCustomDomain.value = '';
         setStatus(statusMessage, `Added: ${clean}`);
       } else {
@@ -386,15 +391,7 @@ export async function loadSettings({
         }
       );
 
-      renderCustomDomains(
-        elements.customDomainsList,
-        updatedConfig.customDomains,
-        async (index) => {
-          getConfig().customDomains.splice(index, 1);
-          await saveConfigFn({ customDomains: getConfig().customDomains });
-          renderCustomDomains(elements.customDomainsList, getConfig().customDomains);
-        }
-      );
+      renderEditableCustomDomains(elements.customDomainsList, getConfig, saveConfigFn);
     }
   } catch (err) {
     console.error('Error loading settings:', err);

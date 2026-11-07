@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Fixed
+* **No native host respawn loop**: an empty PWA list is cached like any other result, and the badge only reacts to settings changes (`storage.sync`), not to the PWA cache it writes itself.
+* **Right app for a URL**: installed apps match by domain or launch URL first; the name fallback runs only after that and needs a whole host label ("Mail" no longer matches gmail.com).
+* **Native host profile**: a URL-only launch uses the matched app's user data dir and profile before the detected default.
+* **Host installer**: builds the whole Go package (`go build .`); building `main.go` alone failed.
+* **Popup**: a failed single-tab move no longer reports success; "Collapse All" survives a re-render; the refresh button comes back after a batch move; custom domains stay removable after the first removal.
+
+---
+
 ## [1.5.2] — 2026-09-21
 
 ### Fixed

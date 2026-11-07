@@ -116,15 +116,6 @@ func main() {
 	profDir := req.ProfileDir
 	appID := req.AppID
 
-	detectedUserDir, detectedProfDir := detectChromeContext()
-	logDebug("Detected context: user_data_dir=%s, profile_dir=%s", detectedUserDir, detectedProfDir)
-	if userDir == "" && detectedUserDir != "" {
-		userDir = detectedUserDir
-	}
-	if profDir == "" && detectedProfDir != "" {
-		profDir = detectedProfDir
-	}
-
 	isPWA := false
 	var matchedApp *PWAInfo
 
@@ -150,10 +141,30 @@ func main() {
 		}
 	}
 
+	// Request first, then the matched app (it may live in another profile),
+	// then the detected context, which always yields a profile.
 	if matchedApp != nil {
-		if profDir == "" && matchedApp.ProfileDir != "" {
+		if userDir == "" && matchedApp.UserDataDir != "" {
+			// Keep the app's dir and profile together; the caller's profile
+			// belongs to another dir. Chrome's own default is "Default".
+			userDir = matchedApp.UserDataDir
+			if profDir == "" {
+				profDir = matchedApp.ProfileDir
+			}
+			if profDir == "" {
+				profDir = "Default"
+			}
+		} else if profDir == "" {
 			profDir = matchedApp.ProfileDir
 		}
+	}
+	detectedUserDir, detectedProfDir := detectChromeContext()
+	logDebug("Detected context: user_data_dir=%s, profile_dir=%s", detectedUserDir, detectedProfDir)
+	if userDir == "" {
+		userDir = detectedUserDir
+	}
+	if profDir == "" {
+		profDir = detectedProfDir
 	}
 
 	chromeBin := findChromeBinary()

@@ -122,6 +122,7 @@ export function findMatchingInstalledApp(urlStr, installedApps = []) {
 
   if (!targetHostname || DANGEROUS_KEYS.has(targetHostname)) return null;
 
+  const candidates = [];
   for (const app of installedApps) {
     if (!app || typeof app !== 'object' || app.enabled === false || app.openInWindow === false) continue;
 
@@ -133,6 +134,7 @@ export function findMatchingInstalledApp(urlStr, installedApps = []) {
       Array.isArray(app.domains);
     const isExtensionOrTheme = app.type === 'extension' || app.type === 'theme';
     if (!isApp || isExtensionOrTheme) continue;
+    candidates.push(app);
 
     // Match via explicit domains array (from OS desktop PWA discovery)
     if (Array.isArray(app.domains)) {
@@ -159,12 +161,15 @@ export function findMatchingInstalledApp(urlStr, installedApps = []) {
         // Ignore invalid appLaunchUrl in installed app metadata
       }
     }
+  }
 
-    // Secondary fallback: match via sanitized app name
+  // Name fallback only after every app failed the domain checks, and only as a
+  // whole host label: "Mail" must not match gmail.com.
+  const hostLabels = targetHostname.split('.').map((l) => l.replace(/[^a-z0-9]/g, ''));
+  for (const app of candidates) {
     if (app.name && typeof app.name === 'string') {
       const cleanName = app.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const cleanHost = targetHostname.replace(/[^a-z0-9]/g, '');
-      if (cleanName.length >= 4 && cleanHost.includes(cleanName)) {
+      if (cleanName.length >= 4 && hostLabels.includes(cleanName)) {
         return app;
       }
     }

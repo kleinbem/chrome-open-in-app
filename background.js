@@ -97,7 +97,10 @@ chrome.windows.onFocusChanged.addListener((winId) => {
     scheduleBadgeUpdate(400);
   }
 });
-chrome.storage.onChanged.addListener(() => scheduleBadgeUpdate(300));
+// Only sync holds settings; local is the PWA cache, which the badge update itself writes.
+chrome.storage.onChanged.addListener((_changes, area) => {
+  if (area === 'sync') scheduleBadgeUpdate(300);
+});
 
 // Global keyboard shortcut handler (Alt+Shift+P)
 chrome.commands.onCommand.addListener(async (command) => {
@@ -149,12 +152,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'GET_MATCHING_TABS': {
           const scope = message.scope || 'current';
           const tabs = await getMatchingTabs(scope, Boolean(message.forceRefresh));
+          // Any refresh (forced, or an expired cache) can change the app list
+          // without a sync change; the update is debounced.
+          scheduleBadgeUpdate(300);
           sendResponse({ success: true, tabs });
           break;
         }
 
         case 'GET_INSTALLED_APPS': {
           const apps = await getInstalledPWAs(Boolean(message.forceRefresh));
+          scheduleBadgeUpdate(300);
           sendResponse({ success: true, apps });
           break;
         }
