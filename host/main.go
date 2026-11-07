@@ -144,10 +144,17 @@ func main() {
 	// Request first, then the matched app (it may live in another profile),
 	// then the detected context, which always yields a profile.
 	if matchedApp != nil {
-		if userDir == "" {
+		if userDir == "" && matchedApp.UserDataDir != "" {
+			// Keep the app's dir and profile together; the caller's profile
+			// belongs to another dir. Chrome's own default is "Default".
 			userDir = matchedApp.UserDataDir
-		}
-		if profDir == "" {
+			if profDir == "" {
+				profDir = matchedApp.ProfileDir
+			}
+			if profDir == "" {
+				profDir = "Default"
+			}
+		} else if profDir == "" {
 			profDir = matchedApp.ProfileDir
 		}
 	}
