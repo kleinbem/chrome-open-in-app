@@ -40,7 +40,7 @@ How to use it:
 5. Alternatively, press Alt + Shift + P anytime to move all eligible tabs instantly.
 
 Privacy & Permissions:
-Open in App does NOT track, collect, transmit, or sell any personal data, browsing history, or website content. All processing runs 100% locally on your machine.
+Open in App does NOT track, collect, transmit, or sell any personal data, browsing history, or website content. Tab matching and app launching run locally on your machine; only your settings sync across your signed-in Chrome browsers (chrome.storage.sync) when Chrome sync is on. If you install the optional native helper (com.kleinbem.open_in_app), the extension asks it to list and launch installed web apps; to find each app's domain the helper reads, on this machine, the Preferences, sync data and (for apps still missing a domain) History files of every local profile of Chrome, Chromium, Brave, Edge and Vivaldi. The extension caches the resulting app list (names, IDs, domains) in chrome.storage.local for an hour. Nothing is sent off the machine.
 
 **Category** [REQUIRED]
 Productivity
@@ -75,6 +75,7 @@ The extension requests only the minimum necessary permissions required for its f
 | `tabs` | permissions | Required to inspect open tab URLs against user-configured app domain rules (e.g. `mail.google.com`) and obtain `tab.id` to reparent tabs into new windows without page reload. Cannot use `activeTab` alone because the core feature requires inspecting and batch-processing background/inactive tabs across the window. |
 | `storage` | permissions | Required to persist user preferences (Window Mode, Window Scope, Pinned Tab Protection, enabled presets, and custom domain rules) across browser sessions and synchronize them across the user's signed-in Chrome browsers via `chrome.storage.sync`. |
 | `contextMenus` | permissions | Required to provide right-click context menu options: "Open this Tab in App Window" on web pages, and "Open All Matching Tabs in App Windows" on the extension action icon. |
+| `nativeMessaging` | permissions | Talks to the optional local native host `com.kleinbem.open_in_app`, which lists installed PWAs and launches them with the right app ID and profile, so tabs open as real app windows. Without the host, discovery falls back to `chrome.management` and launching to `chrome.windows.create`. |
 | `management` | permissions | Required to identify installed Progressive Web Apps (PWAs) by start URL and launch them via `chrome.management.launchApp()`. This enables Chromium to assign the native OS `StartupWMClass`, displaying the application as a standalone entity with its genuine icon and title on the OS taskbar/dock. |
 
 *Note: No `<all_urls>` host permissions or script injection permissions (`scripting`) are requested or required.*
@@ -97,6 +98,8 @@ The extension requests only the minimum necessary permissions required for its f
 | Web history | No | No | N/A | No |
 | User activity | No | No | N/A | No |
 | Website content | No | No | N/A | No |
+
+*The optional native helper reads local browser profiles (Chrome, Chromium, Brave, Edge, Vivaldi: Preferences, sync data, History files) on the user's machine to find installed web apps' domains. The extension keeps the resulting app list in chrome.storage.local as a one-hour cache. Nothing is sent off the device.*
 
 ### Data Use Certification
 - [x] Data is NOT sold to third parties
