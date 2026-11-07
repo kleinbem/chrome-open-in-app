@@ -11,6 +11,14 @@ updates:
         patterns: ["*"]
         update-types: [minor, patch]
 
+  # Native messaging host (stdlib only so far).
+  - package-ecosystem: gomod
+    directory: /host
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+
   # One grouped PR a week for pinned actions; the cooldown skips releases
   # younger than a week.
   - package-ecosystem: github-actions
