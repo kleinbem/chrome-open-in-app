@@ -1,0 +1,64 @@
+name: Package & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  package:
+    name: Package Chrome Extension
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub release
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # No npm cache: a release build must not restore a cache other runs wrote.
+      # setup-node v4 caches only with `cache:` set (package-manager-cache is v5+).
+      - name: Setup Node.js 22 # zizmor: ignore[cache-poisoning]
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Full Validation
+        run: npm run validate
+
+      - name: Extract Version
+        id: get_version
+        run: |
+          VERSION=$(node -p "require('./manifest.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building package for version v$VERSION"
+
+      - name: Create Production Zip for Chrome Web Store
+        run: |
+          npm run package
+          ZIP_NAME="dist/open-in-app-v${{ steps.get_version.outputs.VERSION }}.zip"
+          echo "Package created successfully: $ZIP_NAME"
+          ls -lh "$ZIP_NAME"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: open-in-app-v${{ steps.get_version.outputs.VERSION }}
+          path: dist/open-in-app-v${{ steps.get_version.outputs.VERSION }}.zip
+          retention-days: 90
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          files: dist/open-in-app-v${{ steps.get_version.outputs.VERSION }}.zip
+          name: Release v${{ steps.get_version.outputs.VERSION }}
+          generate_release_notes: true

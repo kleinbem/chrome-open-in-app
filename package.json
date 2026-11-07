@@ -1,0 +1,31 @@
+{
+  "name": "chrome-open-in-app",
+  "version": "1.5.2",
+  "description": "Chrome Extension to batch move open tabs into standalone app windows",
+  "type": "module",
+  "scripts": {
+    "test": "node --test 'tests/**/*.test.js'",
+    "lint": "eslint .",
+    "check": "node --check background.js background/badge.js background/tab-query.js background/tab-mover.js popup/popup.js popup/dom.js popup/tab-list.js popup/settings-view.js utils/matcher.js utils/window-matcher.js",
+    "validate": "npm run check && npm run lint && npm test",
+    "package": "python3 scripts/package.py"
+  },
+  "keywords": [
+    "chrome-extension",
+    "pwa",
+    "app",
+    "tabs",
+    "productivity",
+    "security"
+  ],
+  "author": "kleinbem",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/chrome": "^0.3.7",
+    "eslint": "^10.14.0"
+  },
+  "//": "overrides: minimatch >=11.0.1 fixes GHSA-g3hv-75wg-m249; drop once eslint requires it (https://github.com/eslint/eslint/issues/21463)",
+  "overrides": {
+    "minimatch": "^11.0.1"
+  }
+}

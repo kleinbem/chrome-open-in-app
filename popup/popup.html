@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Open in App</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-group">
+        <img src="../icons/icon-48.png" alt="Logo" class="app-icon">
+        <div>
+          <h1 class="app-title">Open in App</h1>
+          <span id="window-mode-badge" class="badge-sub">App Mode</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btn-open-full-tab" class="nav-btn" title="Open Dashboard in Full Browser Tab">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+        </button>
+        <button id="nav-tabs-btn" class="nav-btn active" title="Tabs View">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="3"></rect>
+            <path d="M3 9h18"></path>
+          </svg>
+        </button>
+        <button id="nav-settings-btn" class="nav-btn" title="Settings">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83-2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Scope Selector Tabs -->
+    <div class="scope-bar">
+      <button id="scope-current-btn" class="scope-tab active">Current Window</button>
+      <button id="scope-all-btn" class="scope-tab">All Windows</button>
+    </div>
+
+    <!-- Progress Indicator -->
+    <div id="progress-container" class="progress-container">
+      <div class="progress-labels">
+        <span id="progress-text">Opening in app...</span>
+        <span id="progress-fraction">0 / 0</span>
+      </div>
+      <div class="progress-track">
+        <div id="progress-fill" class="progress-fill" style="width: 0%;"></div>
+      </div>
+    </div>
+
+    <!-- View: Tabs -->
+    <main id="view-tabs" class="view active">
+      <!-- Master Action Hero -->
+      <div class="hero-card">
+        <div class="hero-top">
+          <div class="stat-group">
+            <span id="tab-count" class="stat-number">0</span>
+            <span class="stat-label">App Tabs Ready</span>
+          </div>
+          <div class="shortcut-pill" title="Global keyboard shortcut">
+            <span class="key">Alt</span>+<span class="key">Shift</span>+<span class="key">P</span>
+          </div>
+        </div>
+
+        <button id="btn-move-selected" class="btn-primary" disabled>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+          <span id="btn-move-text">Open Selected in App (0)</span>
+        </button>
+      </div>
+
+      <!-- Search & Filter Bar -->
+      <div class="search-bar-container">
+        <div class="search-input-wrapper">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="tab-search-input" placeholder="Filter tabs by title, domain, or app..." autocomplete="off" spellcheck="false">
+          <button id="btn-clear-search" class="btn-clear-search" title="Clear search" style="display: none;">&times;</button>
+        </div>
+      </div>
+
+      <!-- Selection Controls Bar -->
+      <div class="selection-bar">
+        <label class="checkbox-container">
+          <input type="checkbox" id="chk-select-all" checked>
+          <span class="checkmark"></span>
+          <span id="selection-count-text" class="selection-label">Select All</span>
+        </label>
+        <div class="selection-actions">
+          <button id="btn-toggle-grouping" class="btn-pill-toggle active" title="Toggle App Grouping vs Flat List">
+            <span id="grouping-btn-text">Grouped</span>
+          </button>
+          <button id="btn-toggle-expand" class="btn-pill-toggle" title="Expand or Collapse All Groups">
+            <span id="expand-btn-text">Collapse All</span>
+          </button>
+          <button id="btn-refresh" class="btn-icon" title="Refresh open tabs">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Dynamic Tab List -->
+      <div id="tabs-list" class="tabs-list">
+        <div class="loading-state">Scanning tabs...</div>
+      </div>
+    </main>
+
+    <!-- View: Settings -->
+    <section id="view-settings" class="view">
+      <!-- Toolbar Action Section -->
+      <div class="settings-section">
+        <h2 class="settings-heading">Toolbar Icon Behavior</h2>
+        <p class="settings-desc">Choose what opens when you click the extension icon in Chrome's toolbar.</p>
+        
+        <div class="radio-options">
+          <label class="radio-card">
+            <input type="radio" name="toolbar-action" value="popup" id="toolbar-mode-popup" checked>
+            <div class="radio-content">
+              <span class="radio-title">Dropdown Popup (Default)</span>
+              <span class="radio-desc">Compact dropdown popup window next to the toolbar icon.</span>
+            </div>
+          </label>
+
+          <label class="radio-card">
+            <input type="radio" name="toolbar-action" value="tab" id="toolbar-mode-tab">
+            <div class="radio-content">
+              <span class="radio-title">Full Browser Tab</span>
+              <span class="radio-desc">Opens the tab manager in a wide browser tab dashboard (ideal for 100+ tabs).</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Default Tabs View Section -->
+      <div class="settings-section">
+        <h2 class="settings-heading">Default Tabs View</h2>
+        <p class="settings-desc">Choose how matching tabs are organized by default.</p>
+        
+        <div class="radio-options">
+          <label class="radio-card">
+            <input type="radio" name="default-grouping" value="grouped" id="grouping-mode-grouped" checked>
+            <div class="radio-content">
+              <span class="radio-title">Grouped by Application (Recommended)</span>
+              <span class="radio-desc">Organized into app cards with individual and group batch controls.</span>
+            </div>
+          </label>
+
+          <label class="radio-card">
+            <input type="radio" name="default-grouping" value="flat" id="grouping-mode-flat">
+            <div class="radio-content">
+              <span class="radio-title">Flat Tab List</span>
+              <span class="radio-desc">Single continuous list of all matching tabs.</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Window Style Section -->
+      <div class="settings-section">
+        <h2 class="settings-heading">Window Style</h2>
+        <p class="settings-desc">Choose how tabs are displayed when opened in separate windows.</p>
+        
+        <div class="radio-options">
+          <label class="radio-card">
+            <input type="radio" name="window-mode" value="popup" id="mode-popup" checked>
+            <div class="radio-content">
+              <span class="radio-title">Frameless App Mode (Default)</span>
+              <span class="radio-desc">Minimalist window without URL bar or tabs. Pure app feel.</span>
+            </div>
+          </label>
+
+          <label class="radio-card">
+            <input type="radio" name="window-mode" value="normal" id="mode-normal">
+            <div class="radio-content">
+              <span class="radio-title">Dedicated Window (With Toolbars)</span>
+              <span class="radio-desc">Preserves extension buttons, extensions puzzle menu, and bookmarks.</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Tab Protection Settings -->
+      <div class="settings-section">
+        <h2 class="settings-heading">Tab Protection</h2>
+        <p class="settings-desc">Prevent tabs you want to keep docked from being moved.</p>
+        <div class="preset-item">
+          <div class="preset-label">
+            <span class="preset-name">Protect Pinned Tabs</span>
+            <span class="preset-domain">Skip pinned tabs during batch operations</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="chk-ignore-pinned" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- App Window Reuse Settings -->
+      <div class="settings-section">
+        <h2 class="settings-heading">App Window Reuse</h2>
+        <p class="settings-desc">Switch to an existing app instance instead of opening duplicates.</p>
+        <div class="preset-item">
+          <div class="preset-label">
+            <span class="preset-name">Reuse Existing App Windows</span>
+            <span class="preset-domain">Focus and navigate existing PWA / app window if open</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="chk-reuse-existing" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Installed PWAs Section (Auto-detected from System) -->
+      <div class="settings-section">
+        <div class="settings-header-action">
+          <div>
+            <h2 class="settings-heading">Installed PWAs (Auto-Detected)</h2>
+            <p class="settings-desc">Apps installed on your computer. Toggle to enable/disable.</p>
+          </div>
+          <button id="btn-rescan-pwas" class="btn-secondary btn-sm" title="Scan system for installed PWAs">Scan System</button>
+        </div>
+        <div id="installed-pwas-list" class="presets-grid"></div>
+      </div>
+
+
+      <!-- Custom Domains Section -->
+      <div class="settings-section">
+        <h2 class="settings-heading">Custom Domains</h2>
+        <p class="settings-desc">Add self-hosted tools or other web app domains.</p>
+        <form id="form-add-custom" class="add-custom-form">
+          <input type="text" id="input-custom-domain" placeholder="e.g. app.slack.com" required>
+          <button type="submit" class="btn-secondary">Add</button>
+        </form>
+        <div id="custom-domains-list" class="custom-domains-list"></div>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="settings-heading">System Diagnostics</h2>
+        <p class="settings-desc">Live inspection of Chromium window types and PWA registration.</p>
+        <div class="diagnostics-card">
+          <div class="diag-item"><span>Open Windows:</span> <span id="diag-windows-count" class="diag-val">Scanning...</span></div>
+          <div class="diag-item"><span>Window Types:</span> <span id="diag-window-types" class="diag-val">-</span></div>
+          <div class="diag-item"><span>PWA API Result:</span> <span id="diag-apps-count" class="diag-val">-</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer Status -->
+    <footer class="app-footer">
+      <span id="status-message">Ready</span>
+      <span id="version-label" class="version-label">v1.5.2</span>
+    </footer>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
