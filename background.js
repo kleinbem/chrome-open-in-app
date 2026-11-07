@@ -152,15 +152,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'GET_MATCHING_TABS': {
           const scope = message.scope || 'current';
           const tabs = await getMatchingTabs(scope, Boolean(message.forceRefresh));
-          // A forced rescan can change the app list without a sync change.
-          if (message.forceRefresh) scheduleBadgeUpdate(300);
+          // Any refresh (forced, or an expired cache) can change the app list
+          // without a sync change; the update is debounced.
+          scheduleBadgeUpdate(300);
           sendResponse({ success: true, tabs });
           break;
         }
 
         case 'GET_INSTALLED_APPS': {
           const apps = await getInstalledPWAs(Boolean(message.forceRefresh));
-          if (message.forceRefresh) scheduleBadgeUpdate(300);
+          scheduleBadgeUpdate(300);
           sendResponse({ success: true, apps });
           break;
         }
