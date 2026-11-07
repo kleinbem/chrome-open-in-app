@@ -17,7 +17,7 @@ Guidance for AI assistants working in this repository.
 | `icons/` | Application icons (16x16, 48x48, 128x128 PNGs). |
 | `utils/matcher.js`, `utils/window-matcher.js` | Domain normalization, URL pattern matching, tab filtering, installed-app matching and grouping. |
 | `host/` | Go native messaging host (`com.kleinbem.open_in_app`): lists and launches installed PWAs. |
-| `scripts/` | `package.py` (store zip), `host/install.sh` (installs the native host). |
+| `scripts/` | `package.py` (store zip), `check.mjs` (`npm run check`), `host/install.sh` (installs the native host). |
 | `tests/` | Node 22 native unit and security test suites (`npm test`). |
 | `CHROMEWEBSTORE.md` | Chrome Web Store listing metadata and permissions justifications. |
 

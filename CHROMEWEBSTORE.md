@@ -40,7 +40,7 @@ How to use it:
 5. Alternatively, press Alt + Shift + P anytime to move all eligible tabs instantly.
 
 Privacy & Permissions:
-Open in App does NOT track, collect, transmit, or sell any personal data, browsing history, or website content. Tab matching and app launching run locally on your machine; only your settings sync across your signed-in Chrome browsers (chrome.storage.sync) when Chrome sync is on. If you install the optional native helper (com.kleinbem.open_in_app), the extension asks it to list and launch installed web apps; to find each app's domain the helper reads the local Chrome profile's Preferences, sync data and, for apps still missing one, its History files. It sends nothing off the machine.
+Open in App does NOT track, collect, transmit, or sell any personal data, browsing history, or website content. Tab matching and app launching run locally on your machine; only your settings sync across your signed-in Chrome browsers (chrome.storage.sync) when Chrome sync is on. If you install the optional native helper (com.kleinbem.open_in_app), the extension asks it to list and launch installed web apps; to find each app's domain the helper reads, on this machine, the Preferences, sync data and (for apps still missing a domain) History files of every local profile of Chrome, Chromium, Brave, Edge and Vivaldi. The extension caches the resulting app list (names, IDs, domains) in chrome.storage.local for an hour. Nothing is sent off the machine.
 
 **Category** [REQUIRED]
 Productivity
@@ -99,7 +99,7 @@ The extension requests only the minimum necessary permissions required for its f
 | User activity | No | No | N/A | No |
 | Website content | No | No | N/A | No |
 
-*The optional native helper reads the local Chrome profile (Preferences, sync data, History files) on the user's machine to find installed web apps' domains. Nothing is stored by the extension or sent off the device.*
+*The optional native helper reads local browser profiles (Chrome, Chromium, Brave, Edge, Vivaldi: Preferences, sync data, History files) on the user's machine to find installed web apps' domains. The extension keeps the resulting app list in chrome.storage.local as a one-hour cache. Nothing is sent off the device.*
 
 ### Data Use Certification
 - [x] Data is NOT sold to third parties
