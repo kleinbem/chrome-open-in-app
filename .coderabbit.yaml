@@ -1,0 +1,8 @@
+# Throwaway test PR, never merged: does CodeRabbit read config from the PR branch,
+# and what does it report for a label-gated skip?
+inheritance: true
+reviews:
+  auto_review:
+    auto_incremental_review: false
+    labels:
+      - "cr-review"
