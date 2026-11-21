@@ -1,0 +1,6 @@
+# Throwaway review-only PR, never merged: does base_branches let the label alone start a review?
+inheritance: true
+reviews:
+  auto_review:
+    base_branches:
+      - "review/.*"
