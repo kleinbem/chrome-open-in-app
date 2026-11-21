@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Lint, Test & Validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax Check
+        run: npm run check
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Unit & Security Tests
+        run: npm test
+
+      - name: Validate Icons & Manifest
+        run: |
+          # Verify icons exist and are not empty
+          test -s icons/icon-16.png
+          test -s icons/icon-48.png
+          test -s icons/icon-128.png
+
+          # Validate manifest JSON structure
+          node -e "
+            const fs = require('fs');
+            const manifest = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+            if (manifest.manifest_version !== 3) throw new Error('Must be Manifest V3');
+            if (!manifest.name || !manifest.version) throw new Error('Missing name or version');
+            console.log('Manifest V3 valid:', manifest.name, 'v' + manifest.version);
+          "
