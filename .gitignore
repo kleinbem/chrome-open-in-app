@@ -1,0 +1,10 @@
+.DS_Store
+Thumbs.db
+node_modules/
+*.crx
+*.zip
+dist/
+.direnv/
+__pycache__/
+*.pyc
+host/chrome-open-in-app-host*
