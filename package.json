@@ -22,10 +22,6 @@
   "license": "MIT",
   "devDependencies": {
     "@types/chrome": "^0.3.7",
-    "eslint": "^10.14.0"
-  },
-  "//": "overrides: minimatch >=11.0.1 fixes GHSA-g3hv-75wg-m249; drop once eslint requires it (https://github.com/eslint/eslint/issues/21463)",
-  "overrides": {
-    "minimatch": "^11.0.1"
+    "eslint": "^10.15.0"
   }
 }
